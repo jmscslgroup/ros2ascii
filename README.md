@@ -17,10 +17,15 @@ On a RAV4 running libpanda and can_to_ros, subscribes to topics /tracka0, /track
 ![Chaos](https://github.com/jmscslgroup/ros2ascii/blob/main/docs/images/radar2ascii2.png?raw=true)
 
 Press the spacebar to toggle auto camera rotate, then:
+
 WASD: move camera
+
 Arrow keys: Pan/Tilt
+
 T/R: zoom in/out
+
 G: toggle grid
+
 Escape: quit
 
 
