@@ -99,7 +99,7 @@ public:
     }
     
     void callbackSteerAngle(const std_msgs::Float64::ConstPtr& msg) {
-        steeringAngle = msg->data;
+        steeringAngle = -msg->data; // For whatever reason the steering angle reported in ROS is reversed?
     }
     
     void draw(Coordinates2D center, double width, double height) {
