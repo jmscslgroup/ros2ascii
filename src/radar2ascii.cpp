@@ -125,24 +125,26 @@ public:
             heading = 0;
             return;
         }
-        longitude = 0.9*longitude + 0.1*msg->longitude;
-        latitude = 0.9*latitude + 0.1*msg->latitude;
+        longitude = 0.85*longitude + 0.15*msg->longitude;
+        latitude = 0.85*latitude + 0.15*msg->latitude;
         
         diffLong = (longitude - priorLong) * METERS_PER_DEGREE;
         diffLat = (latitude - priorLat) * METERS_PER_DEGREE;
-        if((fabs(diffLong) > 1) || (fabs(diffLat) > 1)) {
+        if( (diffLong*diffLong + diffLat*diffLat) > 0.25) {
             heading = atan2(diffLong, diffLat);
             priorLong = longitude;
             priorLat = latitude;
+            diffLong = 0;
+            diffLat = 0;
         }
+        
     }
     
     void draw(int x, int y) {
         mvprintw(y, x,   "Longitude %.06f", longitude);
         mvprintw(y+1, x, "Latitude  %.06f", latitude);
         mvprintw(y+2, x, "Heading   %.02f", heading  * 180/M_PI);
-        mvprintw(y+3, x, "diffLong  %.02f", diffLong);
-        mvprintw(y+4, x, "diffLat   %.02f", diffLat);
+        mvprintw(y+3, x, "diffMag   %.02f", (diffLong*diffLong + diffLat*diffLat));
         
         
     }
@@ -377,6 +379,7 @@ int main(int argc, char **argv) {
 //    Mat4D translationScreen = translationMatrix((double)screenSizeX/2 -0.5, (double)screenSizeY/2 -0.5, 0);
 //    Mat4D windowFull = matrixMultiply(translationScreen, windowScale);
     Mat4D windowFull = makeWindowTransform(screenSizeX, screenSizeY, characterAspect);
+    windowFull.d[0][0] *= -1;   // HACK the car is aligned with GPS, heading, and radar but mirrores over x.  This mirrors the viewport
     
     int numEdges;
     int debugLine = 0;
