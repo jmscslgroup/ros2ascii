@@ -374,7 +374,7 @@ int main(int argc, char **argv) {
             Mat4D scale = scaleMatrix(0.15, 0.15, 0.15);
 //            Mat4D translation = translationMatrix(30 + 40*sin(lightAngle*(i+1)/(double)numObjects), i-numObjects/2, 1);
             // Notice I swapped x and y here:
-            Mat4D translation = translationMatrix(mRadarListener.points[i].x*carScale , mRadarListener.points[i].y*carScale+ carTranslationLongitude, 1.7272*carScale/2);
+            Mat4D translation = translationMatrix(mRadarListener.points[i].x*carScale , -mRadarListener.points[i].y*carScale+ carTranslationLongitude, 1.7272*carScale/2);
             Mat4D model = matrixMultiply(translation, scale);
             Mat4D objectModelView = matrixMultiply(viewMatrix, model);
             numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
