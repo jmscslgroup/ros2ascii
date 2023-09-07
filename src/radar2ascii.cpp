@@ -30,6 +30,11 @@
 #include "geometry_msgs/PointStamped.h"
 #include "sensor_msgs/NavSatFix.h"
 
+
+
+#define METERS_PER_DEGREE (111000.0)
+
+
 /*
  Catch ctrl-c for cleaner exits
  */
@@ -90,24 +95,56 @@ class GpsListener {
 private:
     ros::NodeHandle* nodeHandle;
     ros::Subscriber subscriber;
+    double priorLong;
+    double priorLat;
+    
+    
+public:
     
     double longitude;
     double latitude;
+    double diffLong, diffLat;
     
-public:
+    
+    double heading; // calculated form lat/long
+    bool first;
+    
     GpsListener(ros::NodeHandle* nh) {
+        first = true;
         nodeHandle = nh;
         subscriber = nodeHandle->subscribe("/gps_fix", 1000, &GpsListener::callbackGps, this);
     }
     
     void callbackGps(const sensor_msgs::NavSatFix::ConstPtr& msg) {
-        longitude = msg->longitude;
-        latitude = msg->latitude;
+        if(first) {
+            first = false;
+            longitude = msg->longitude;
+            latitude = msg->latitude;
+            priorLong = longitude;
+            priorLat = latitude;
+            heading = 0;
+            return;
+        }
+        longitude = 0.9*longitude + 0.1*msg->longitude;
+        latitude = 0.9*latitude + 0.1*msg->latitude;
+        
+        diffLong = (longitude - priorLong) * METERS_PER_DEGREE;
+        diffLat = (latitude - priorLat) * METERS_PER_DEGREE;
+        if((fabs(diffLong) > 1) || (fabs(diffLat) > 1)) {
+            heading = atan2(diffLong, diffLat);
+            priorLong = longitude;
+            priorLat = latitude;
+        }
     }
     
     void draw(int x, int y) {
         mvprintw(y, x,   "Longitude %.06f", longitude);
         mvprintw(y+1, x, "Latitude  %.06f", latitude);
+        mvprintw(y+2, x, "Heading   %.02f", heading  * 180/M_PI);
+        mvprintw(y+3, x, "diffLong  %.02f", diffLong);
+        mvprintw(y+4, x, "diffLat   %.02f", diffLat);
+        
+        
     }
 };
 
@@ -264,7 +301,7 @@ int main(int argc, char **argv) {
     };
     
 #define NUM_GRID_LINES (11)
-#define GRID_LINE_UNIT (2)
+#define GRID_LINE_UNIT (4)
     Coordinates4D grid[NUM_GRID_LINES*2*2];    // 5x5 grid
     int gridEdgeIndices[NUM_GRID_LINES*2][2];
     for (int i = 0; i < NUM_GRID_LINES*2*2; i++) {
@@ -349,7 +386,7 @@ int main(int argc, char **argv) {
     double tilt = M_PI/4;
     bool usePerspective = true;
     bool showGrid = true;
-    bool autoRotate = true;
+    bool autoRotate = false;
     bool showDepth = false;
     
     ros::Rate rate(60);
@@ -394,13 +431,13 @@ int main(int argc, char **argv) {
         
         
         int numObjects = 16;
-        double carTranslationLongitude = -8;
+        double carTranslationLongitude = -0; // -8
         double carScale = 0.2;
         for( int i = 0; i < numObjects; i++) {
             Mat4D scale = scaleMatrix(0.15, 0.15, 0.15);
 //            Mat4D translation = translationMatrix(30 + 40*sin(lightAngle*(i+1)/(double)numObjects), i-numObjects/2, 1);
             // Notice I swapped x and y here:
-            Mat4D translation = translationMatrix(mRadarListener.points[i].x*carScale , -mRadarListener.points[i].y*carScale+ carTranslationLongitude, 1.7272*carScale/2);
+            Mat4D translation = translationMatrix(-mRadarListener.points[i].x*carScale , -mRadarListener.points[i].y*carScale+ carTranslationLongitude, 1.7272*carScale/2);
             Mat4D model = matrixMultiply(translation, scale);
             Mat4D objectModelView = matrixMultiply(viewMatrix, model);
             numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
@@ -413,10 +450,25 @@ int main(int argc, char **argv) {
         
         // Grid:
         if (showGrid) {
+            double latitudeInMeters = mGpsListener.longitude * METERS_PER_DEGREE;
+            double longitudeInMeters = mGpsListener.latitude * METERS_PER_DEGREE;
+            
+            double offestLat = fmod(longitudeInMeters *carScale, GRID_LINE_UNIT );
+            double offestLong = fmod(latitudeInMeters*carScale, GRID_LINE_UNIT );
+
+            Mat4D gridOffset = translationMatrix(offestLat, offestLong, 0 );
+            
+            cameraAxis.x = 0;
+            cameraAxis.y = 0;
+            cameraAxis.z = 1;
+            Mat4D gridRotation = rotationFromAngleAndUnitAxis(-mGpsListener.heading - M_PI/2.0, cameraAxis);
+            
             Coordinates4D grid2[sizeof(grid)/sizeof(grid[0])];
             for (int i = 0; i < sizeof(grid2)/sizeof(grid2[0]); i++) {
                 grid2[i] = grid[i];
                 // Model
+                grid2[i] = matrixVectorMultiply(gridOffset, grid2[i]);
+                grid2[i] = matrixVectorMultiply(gridRotation, grid2[i]);
                 
                 // View
                 grid2[i] = matrixVectorMultiply(viewMatrix, grid2[i]);
