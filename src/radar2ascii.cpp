@@ -28,6 +28,7 @@
 #include "std_msgs/Bool.h"
 #include "std_msgs/Float64.h"
 #include "geometry_msgs/PointStamped.h"
+#include "sensor_msgs/NavSatFix.h"
 
 /*
  Catch ctrl-c for cleaner exits
@@ -85,7 +86,32 @@ void setupTerminal()
 }
 
 
-class  SteeringListener {
+class GpsListener {
+private:
+    ros::NodeHandle* nodeHandle;
+    ros::Subscriber subscriber;
+    
+    double longitude;
+    double latitude;
+    
+public:
+    GpsListener(ros::NodeHandle* nh) {
+        nodeHandle = nh;
+        subscriber = nodeHandle->subscribe("/gps_fix", 1000, &GpsListener::callbackGps, this);
+    }
+    
+    void callbackGps(const sensor_msgs::NavSatFix::ConstPtr& msg) {
+        longitude = msg->longitude;
+        latitude = msg->latitude;
+    }
+    
+    void draw(int x, int y) {
+        mvprintw(y, x,   "Longitude %.06f", longitude);
+        mvprintw(y+1, x, "Latitude  %.06f", latitude);
+    }
+};
+
+class SteeringListener {
 private:
     ros::NodeHandle* nodeHandle;
     ros::Subscriber subscriber;
@@ -200,7 +226,7 @@ int main(int argc, char **argv) {
 	
     RadarListener mRadarListener(&nh);
     SteeringListener mSteeringListener(&nh);
-    
+    GpsListener mGpsListener(&nh);
     
     Coordinates4D cube[] = {
         {-1, -1, -1, 1},
@@ -435,6 +461,8 @@ int main(int argc, char **argv) {
         steeringCenter.x = screenSizeX - steeringWidth - 1;
         steeringCenter.y = steeringHeight + 1.5;  // +1.5 to allow for text
         mSteeringListener.draw(steeringCenter, steeringWidth, steeringHeight);
+        
+        mGpsListener.draw(0,3);
         
         if (autoRotate) {
             angle -= 0.01;
