@@ -1,7 +1,7 @@
 # ros2ascii
 Terminal software graphics visualizer for ROS using ASCII art
 
-Code is in the form of C++ ROS nodes.
+Code is in the form of C++ ROS nodes.  Only tested on Raspbian with ROS Noetic.
 
 
 This is based on the curses-gfx library here: [https://github.com/blegas78/curses-gfx](https://github.com/blegas78/curses-gfx)

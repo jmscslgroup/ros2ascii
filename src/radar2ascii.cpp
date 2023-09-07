@@ -85,6 +85,51 @@ void setupTerminal()
 }
 
 
+class  SteeringListener {
+private:
+    ros::NodeHandle* nodeHandle;
+    ros::Subscriber subscriber;
+    
+    double steeringAngle;
+public:
+    
+    SteeringListener(ros::NodeHandle* nh) {
+        nodeHandle = nh;
+        subscriber = nodeHandle->subscribe("/steering_angle", 1000, &SteeringListener::callbackSteerAngle, this);
+    }
+    
+    void callbackSteerAngle(const std_msgs::Float64::ConstPtr& msg) {
+        steeringAngle = msg->data;
+    }
+    
+    void draw(Coordinates2D center, double width, double height) {
+        Coordinates2D point1 = center;
+        Coordinates2D point2 = {.x = 25, .y=0};
+        
+        for (double i = 1; i <= 60; i+=1) {
+            attron(COLOR_PAIR(4));
+            double x = center.x + ((double)width)*sin(i *M_PI*2.0/60.0 + steeringAngle*M_PI/180.0) + 0.5;
+            double y = center.y - ((double)height)*cos(i *M_PI*2.0/60.0 + steeringAngle*M_PI/180.0) + 0.5;
+            drawDotFloat(x,y);
+//            mvaddch(y, x, '*');
+            attroff(COLOR_PAIR(4));
+        }
+        
+        point1 = center;
+        
+        attron(A_BOLD);
+        attron(COLOR_PAIR(1));
+        point2.x = point1.x + width*sin(steeringAngle*M_PI/180.0) + 0.5;
+        point2.y = point1.y - height*cos(steeringAngle*M_PI/180.0) + 0.5;
+        ln2(point1, point2);
+        attroff(COLOR_PAIR(1));
+        attroff(A_BOLD);
+        
+        
+        mvprintw(center.y - (height + 1), center.x - 20/2, "Steering Angle %.01f", steeringAngle);
+    }
+};
+
 class RadarListener {
 private:
     ros::Subscriber subscriberATracks[16];
@@ -154,6 +199,7 @@ int main(int argc, char **argv) {
     setupTerminal();
 	
     RadarListener mRadarListener(&nh);
+    SteeringListener mSteeringListener(&nh);
     
     
     Coordinates4D cube[] = {
@@ -372,6 +418,23 @@ int main(int argc, char **argv) {
 //            mvaddch(mRadarListener.points[0].x + 10 + i, mRadarListener.points[0].y + 10, '0' + (char)i);
 //        }
         
+        
+        Coordinates2D steeringCenter;
+//        double steeringWidth = 15;
+//        double steeringHeight = steeringWidth / characterAspect;
+        double steeringHeight;
+        double steeringWidth;
+        if(screenSizeY / screenAspect > screenSizeX) {
+            steeringWidth = 0.125 * screenSizeX;
+            steeringHeight = steeringWidth / characterAspect;
+        } else {
+            steeringHeight = 0.125 * screenSizeY;
+            steeringWidth = steeringHeight * characterAspect;
+        }
+        
+        steeringCenter.x = screenSizeX - steeringWidth - 1;
+        steeringCenter.y = steeringHeight + 1.5;  // +1.5 to allow for text
+        mSteeringListener.draw(steeringCenter, steeringWidth, steeringHeight);
         
         if (autoRotate) {
             angle -= 0.01;
