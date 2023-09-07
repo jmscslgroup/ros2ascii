@@ -538,6 +538,8 @@ int main(int argc, char **argv) {
             
             screenAspect = (double)screenSizeX/(double)screenSizeY / characterAspect;
             windowFull = makeWindowTransform(screenSizeX, screenSizeY, characterAspect);
+            windowFull.d[0][0] *= -1;   // HACK the car is aligned with GPS, heading, and radar but mirrores over x.  This mirrors the viewport
+
             
             if (usePerspective) {
                 projection = projectionMatrixPerspective(viewAngle, screenAspect, zFar, zNear);
