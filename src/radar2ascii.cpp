@@ -556,16 +556,16 @@ int main(int argc, char **argv) {
         } else if ( ch == 'g' || ch == 'G') {
             showGrid = !showGrid;
         } else if ( ch == KEY_LEFT) {
-            angle += 0.05;
-        } else if ( ch == KEY_RIGHT) {
             angle -= 0.05;
+        } else if ( ch == KEY_RIGHT) {
+            angle += 0.05;
         } else if ( ch == KEY_UP) {
             tilt += 0.05;
         } else if ( ch == KEY_DOWN) {
             tilt -= 0.05;
         } else if ( ch == 'a' || ch == 'A') {
             // Left
-            Mat4D motion = translationMatrix(0.25, 0, 0);
+            Mat4D motion = translationMatrix(-0.25, 0, 0);
             Mat4D camTrans = transpose(cameraOrientation);
             Mat4D offset = matrixMultiply(camTrans, motion);
             offset.d[0][0] = 1; offset.d[0][1] = 0;  offset.d[0][2] = 0;
@@ -574,7 +574,7 @@ int main(int argc, char **argv) {
             cameraTranslation = matrixMultiply(offset, cameraTranslation);
         } else if ( ch == 'd' || ch == 'D') {
              // Right
-            Mat4D motion = translationMatrix(-0.25, 0, 0);
+            Mat4D motion = translationMatrix(+0.25, 0, 0);
             Mat4D camTrans = transpose(cameraOrientation);
             Mat4D offset = matrixMultiply(camTrans, motion);
             offset.d[0][0] = 1; offset.d[0][1] = 0;  offset.d[0][2] = 0;
