@@ -661,8 +661,6 @@ public:
     Mat4D mapModel[4];
     
     MapHandler() {
-//        map = new Texture[4]("load failure");
-//        mapGood = new bool[4];
         longitude = 0;
         latitude = 0;
         zoom = 18;
@@ -887,10 +885,10 @@ int main(int argc, char **argv) {
     squareVi[2].vertex = { 1,  0, 0, 1};
     squareVi[3].vertex = {0,  0, 0, 1};
     
-    squareVi[0].textureCoord = {0, 0};
-    squareVi[1].textureCoord = {0, 1};
-    squareVi[2].textureCoord = {1, 1};
-    squareVi[3].textureCoord = {1, 0};
+    squareVi[0].textureCoord = {0, 1};
+    squareVi[1].textureCoord = {1, 1};
+    squareVi[2].textureCoord = {1, 0};
+    squareVi[3].textureCoord = {0, 0};
     
     squareViIndices[0][0] = 0;  // right handed
     squareViIndices[0][1] = 1;
@@ -915,7 +913,7 @@ int main(int argc, char **argv) {
 //    double testIncrementor = 0;
 //    double testLong = -86.7931535;
 //    double testLat = 36.14507466666666;
-    mMapHandler.setLongLat(-86.7931535, 36.14507466666666);
+//    mMapHandler.setLongLat(-86.7931535, 36.14507466666666);
     
     
     // Model
@@ -1172,7 +1170,7 @@ int main(int argc, char **argv) {
         }
         
         // Car:
-        Coordinates3D carColor = {0,1,1};
+        Coordinates3D carColor = {1,1,0};
         Mat4D carScaleMatrix = scaleMatrix(4.6228*carScale/2, 1.8542*carScale/2, 1.7272*carScale/2);
         Mat4D carTranslation = translationMatrix(0, carTranslationLongitude, 1.7272*carScale/2 );
         Mat4D carModel = matrixMultiply(carTranslation, carScaleMatrix);
