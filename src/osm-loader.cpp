@@ -47,6 +47,26 @@ void longLatToOffsetMeters(int zoom, double longitude, double latitude, double& 
     
 }
 
+void tileToOffsetMeters(const OsmTile& tile, double longitude, double latitude, double& xOffset, double& yOffset) {
+//    OsmTile tile = latLongToTile( zoom, longitude, latitude);
+    
+    double longTile, latTile;
+    tileToLatLong(tile, longTile, latTile);
+    
+    const double EARTH_CIR_METERS = 40075016.686;
+    const double degreesPerMeter = 360 / EARTH_CIR_METERS;
+    
+    double metersPerPixelEW = EARTH_CIR_METERS / (double)(1 << (tile.zoom + 8));
+    double metersPerPixelNS = EARTH_CIR_METERS / (double)(1 << (tile.zoom + 8)) * cos(latitude*3.1415926535897/180.0);
+    
+//    const shiftMetersEW = width/2 * metersPerPixelEW;
+//      const shiftMetersNS = height/2 * metersPerPixelNS;
+    
+    xOffset =  ( longTile - longitude)/ degreesPerMeter* cos(latitude*3.1415926535897/180.0);
+    yOffset =  ( latTile - latitude)/ degreesPerMeter;
+    
+}
+
 void tileToLatLong(const OsmTile& tile, double& longitude, double& latitude) {
     int n = 1 << tile.zoom;
     longitude = ((double)tile.x/(double)n) * 360.0 - 180.0;

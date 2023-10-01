@@ -658,7 +658,7 @@ public:
     Texture map[4];
     bool mapGood[4];
     
-    Mat4D mapModel;
+    Mat4D mapModel[4];
     
     MapHandler() {
 //        map = new Texture[4]("load failure");
@@ -673,7 +673,7 @@ public:
         currentTileWidth = 0;
         currentTileTopLeftLong = 0;
         currentTileTopLeftLat = 0;
-        mapModel = translationMatrix(0,0,0);
+        mapModel[0] = translationMatrix(0,0,0);
     }
     
     bool insideMap( double longitude, double latitude) {
@@ -688,41 +688,81 @@ public:
        
     }
     
-    void updateModelMatrix() {
+    void loadTextureFromTile( const OsmTile& tile, int index ) {
+//        tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
+//        currentTileWidth = tileWidthInMeters( latitude, zoom);
+//        mapModel = scaleMatrix(currentTileWidth,currentTileWidth,0);
+        
+        char tileFile[200];
+        if(downloadTile(tile, "/home/matt", tileFile)) {
+            map[index].resize(1,1);
+            
+        } else {
+            map[index].loadPng(tileFile);
+//            map[index].offsetAvergageToCenter(0.75);
+//            map[index].normalize(1.);
+//            map[index].invert();
+            
+            
+            map[index].invert();
+            map[index].scale(3);
+//            map[index].normalize(1.);
+        }
+        updateModelMatrix(tile, index);
+    }
+    
+    void updateModelMatrix(const OsmTile& tile, int index) {
         double xOffset, yOffset;
-        longLatToOffsetMeters(zoom, longitude, latitude, xOffset, yOffset);
+//        longLatToOffsetMeters(zoom, longitude, latitude, xOffset, yOffset);
+        tileToOffsetMeters(tile, longitude, latitude, xOffset, yOffset);
         
         Mat4D translation = translationMatrix(xOffset,yOffset,0);
         Mat4D scale = scaleMatrix(currentTileWidth,currentTileWidth,0);
-        mapModel = matrixMultiply(translation , scale);
+        mapModel[index] = matrixMultiply( translation, scale);
+    }
+    
+    void updateAdjacentTiles() {
+        double xOffset, yOffset;
+        tileToOffsetMeters(currentTile, longitude, latitude, xOffset, yOffset);
+        
+        OsmTile adjacentTileX = currentTile;
+        if(-xOffset < currentTileWidth/2.0) {
+            adjacentTileX.x--;
+        } else {
+            adjacentTileX.x++;
+        }
+        loadTextureFromTile( adjacentTileX, 1 );
+        
+        OsmTile adjacentTileY = currentTile;
+        if(yOffset < currentTileWidth/2.0) {
+            adjacentTileY.y--;
+        } else {
+            adjacentTileY.y++;
+        }
+        loadTextureFromTile( adjacentTileY, 2 );
+        
+        
+        OsmTile adjacentTileXY = currentTile;
+        adjacentTileXY.x = adjacentTileX.x;
+        adjacentTileXY.y = adjacentTileY.y;
+        loadTextureFromTile( adjacentTileXY, 3 );
+        
     }
     
     void setLongLat( double longitude, double latitude) {
-        if(insideMap(longitude, latitude)){
-            this->longitude = longitude;
-            this->latitude = latitude;
-            updateModelMatrix();
-            return;
-        }
         this->longitude = longitude;
         this->latitude = latitude;
         
-        currentTile = latLongToTile(zoom, longitude, latitude);
-        tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
-        currentTileWidth = tileWidthInMeters( latitude, zoom);
-//        mapModel = scaleMatrix(currentTileWidth,currentTileWidth,0);
-        updateModelMatrix();
-        char tileFile[200];
-        if(downloadTile(currentTile, "/home/matt", tileFile)) {
-//            printf("Failed to download file!\n");
-            map[0].resize(1,1);
+        if(insideMap(longitude, latitude)){
+            updateModelMatrix(currentTile, 0);
+        } else {
+            currentTile = latLongToTile(zoom, longitude, latitude);
+            tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
+            currentTileWidth = tileWidthInMeters( latitude, zoom);
+            loadTextureFromTile( currentTile, 0 );
         }
-//        printf("File result: %s\n", tileFile);
-//        Texture mapTexture(tileFile);
-        map[0].loadPng(tileFile);
-        map[0].offsetAvergageToCenter(0.75);
-        map[0].normalize(1.);
-        map[0].invert();
+        
+        updateAdjacentTiles();
     }
 };
 
@@ -872,10 +912,10 @@ int main(int argc, char **argv) {
 //    mapTexture.invert();
     
     MapHandler mMapHandler;
-    double testIncrementor = 0;
-    double testLong = -86.7931535;
-    double testLat = 36.14507466666666;
-    mMapHandler.setLongLat(testLong, testLat);
+//    double testIncrementor = 0;
+//    double testLong = -86.7931535;
+//    double testLat = 36.14507466666666;
+    mMapHandler.setLongLat(-86.7931535, 36.14507466666666);
     
     
     // Model
@@ -1104,9 +1144,9 @@ int main(int argc, char **argv) {
             
             // Square floor:
             
-            testIncrementor += 0.03;
-            testLong += 0.000010 * cos(testIncrementor*0.1);
-            testLat  += 0.00001 * sin(testIncrementor*0.1);
+//            testIncrementor += 0.03;
+//            testLong += 0.000010 * cos(testIncrementor*0.1);
+//            testLat  += 0.00001 * sin(testIncrementor*0.1);
 //            mMapHandler.setLongLat(testLong, testLat);
             
             mMapHandler.setLongLat(mGpsListener.longitudeRaw, mGpsListener.latitudeRaw);
@@ -1115,15 +1155,19 @@ int main(int argc, char **argv) {
 //            Mat4D modelTranslation = translationMatrix(0, 0, 0 );
 //            Mat4D modelScale = mMapHandler.mapModel;// scaleMatrix(30, 30, 30);
 //            Mat4D modelSquare = matrixMultiply(modelTranslation, modelScale);
-            Mat4D modelViewMap = matrixMultiply(viewMatrix, mMapHandler.mapModel);
-            mUniformInfo.modelView = modelViewMap;
-            //        mUniformInfo.modelView = modelSquare;
-            mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+            
             
             // Map
             
             mRenderPipeline.setFragmentShader(mapShader);
-            mRenderPipeline.rasterizeShader(squareVi, &mUniformInfo, squareViIndices, 2, (void*)&mMapHandler.map[0], myVertexShader);
+            Mat4D mapRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, cameraAxis);
+            for(int i = 0; i < 4; i++) {
+                Mat4D modelViewMap = matrixMultiply(mapRotation, mMapHandler.mapModel[i]);
+                modelViewMap = matrixMultiply(viewMatrix, modelViewMap);
+                mUniformInfo.modelView = modelViewMap;
+                mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+                mRenderPipeline.rasterizeShader(squareVi, &mUniformInfo, squareViIndices, 2, (void*)&mMapHandler.map[i], myVertexShader);
+            }
             
         }
         
@@ -1306,9 +1350,11 @@ int main(int argc, char **argv) {
         } else if ( ch == ' ' ) {
             autoRotate = !autoRotate;
         } else if ( ch == '-' || ch == '_' ) {
-            mMapHandler.zoom--;
+            if(mMapHandler.zoom > 2)
+                mMapHandler.zoom--;
         } else if ( ch == '=' || ch == '+' ) {
-            mMapHandler.zoom++;
+            if(mMapHandler.zoom < 19)
+                mMapHandler.zoom++;
         } else if ( ch == 'd' || ch == 'D' ) {
             showDepth = !showDepth;
         } else if ( ch == 'u' || ch == 'U' ) {

@@ -28,5 +28,6 @@ double tileWidthInMeters(double latitude, int zoom);
 bool downloadTile(const OsmTile& tile, const char* cachedirectory, char* resultPath);
 
 void longLatToOffsetMeters(int zoom, double longitude, double latitude, double& xOffset, double& yOffset);
+void tileToOffsetMeters(const OsmTile& tile, double longitude, double latitude, double& xOffset, double& yOffset);
 
 #endif //OSM_LOADER_H
