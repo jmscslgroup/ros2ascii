@@ -3,6 +3,7 @@ project(ros2ascii)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
+set(CMAKE_CXX_STANDARD 17)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -13,7 +14,10 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
   sensor_msgs
-  message_generation
+ # message_generation
+  tf2
+  tf2_ros
+  geodesy
 )
 
 ## System dependencies are found with CMake's conventions
@@ -72,10 +76,10 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-   DEPENDENCIES
-   std_msgs
- )
+#generate_messages(
+#   DEPENDENCIES
+#   std_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -107,7 +111,7 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#   INCLUDE_DIRS include  #uncomment
+  INCLUDE_DIRS include  #uncomment
 #  LIBRARIES can_speed_decoder
 #  CATKIN_DEPENDS roscpp rospy std_msgs
 CATKIN_DEPENDS message_runtime
@@ -121,7 +125,7 @@ CATKIN_DEPENDS message_runtime
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-#  include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -239,20 +243,9 @@ else()
 	message(" - curses-gfx NOT found")
 endif()
 
-#add_executable(gpsfix src/gps_node.cpp)
-#target_link_libraries(gpsfix ${catkin_LIBRARIES})
-
-if(DEFINED LIBPANDA_FOUND)
-#	add_executable(publish_libpanda src/publish_libpanda.cpp)
-#	target_link_libraries(publish_libpanda ${catkin_LIBRARIES} libpandac.so) #libpandac.so
-endif()
-
-#add_executable(cbf_smoother src/cbf_smoother.cpp)
-#target_link_libraries(cbf_smoother ${catkin_LIBRARIES})
 
 if(DEFINED CURSES_GFX_FOUND)
-	add_executable(radar2ascii src/radar2ascii.cpp)
+	add_executable(radar2ascii src/radar2ascii.cpp src/osm-loader.cpp)
 	target_link_libraries(radar2ascii  ${catkin_LIBRARIES} ncurses cursesgfx)
 endif()
 
-# message( " @@@@@@@@@@@@@@@@@@@@@@@ " ${PROJECT_SOURCE_DIR})
