@@ -71,7 +71,9 @@ void mapShader(const FragmentInfo& fInfo) {
     MapVertexInfo* vertexInfo = (MapVertexInfo*)fInfo.interpolated;
 
     Texture* mapTexture = (Texture*) fInfo.data;
+    double factor =  1.0;///(vertexInfo->vertex.z +2);//(Q_rsqrt(vertexInfo->vertex.z*100 + 2);
     *fInfo.colorOutput = mapTexture->sample(vertexInfo->textureCoord.x, vertexInfo->textureCoord.y);
+    *fInfo.colorOutput = *fInfo.colorOutput * factor;
     fInfo.colorOutput->a = 0;
 }
 
@@ -227,11 +229,21 @@ public:
         q[1] = 0;
         q[2] = 0;
         q[3] = 0;
+        acceleration.x = 0;
+        acceleration.y = 0;
+        acceleration.z = 0;
+        rotationRate.x = 0;
+        rotationRate.y = 0;
+        rotationRate.z = 0;
+        magnetic.magnetic_field.x = 0;
+        magnetic.magnetic_field.y = 0;
+        magnetic.magnetic_field.z = 0;
         subscriber = nh->subscribe("/microstrain/imu", 1000, &ImuListener::callback, this);
         subscriberMagnetic = nh->subscribe("/microstrain/mag", 1000, &ImuListener::callbackMagnetic, this);
         acceleration.z = 1;
         rotationRate.z = 1;
         orientation = translationMatrix(0, 0, 0);
+        
     }
 };
 
@@ -240,6 +252,7 @@ class GpsListener {
 private:
     ros::NodeHandle* nodeHandle;
     ros::Subscriber subscriberGps;
+    ros::Subscriber subscriberGpsHeading;
     ros::Subscriber subscriberOdom;
     ros::Subscriber subscriberOdomFilteredLocal;
     ros::Subscriber subscriberOdomFilteredGlobal;
@@ -270,6 +283,7 @@ public:
     
     double x, y, theta; // final output
     double covX, covY;
+    Mat4D covarianceGps;
     
     typedef enum {
         LOCALIZATION_GPS,
@@ -300,11 +314,13 @@ public:
         
         x = y = theta = 0; // final output
         covX = covY = 0;
+        covarianceGps = scaleMatrix(1, 1, 1);
         
         localizationMethodToShow = LOCALIZATION_FILTERED_GLOBAL;
 
         nodeHandle = nh;
-        subscriberGps = nodeHandle->subscribe("/car/gps/gps_fix_patched", 1000, &GpsListener::callbackGps, this);
+        subscriberGps = nodeHandle->subscribe("/car/gps/fix", 1000, &GpsListener::callbackGps, this);
+        subscriberGpsHeading = nodeHandle->subscribe("/car/gps/heading", 1000, &GpsListener::callbackGpsHeading, this);
         subscriberOdom = nodeHandle->subscribe("/car/odometry/differential_drive", 1000, &GpsListener::callbackCarOdom, this);
         subscriberOdomFilteredLocal  = nodeHandle->subscribe("/odometry/filtered/local", 1000, &GpsListener::callbackOdomFilteredLocal, this);
         subscriberOdomFilteredGlobal = nodeHandle->subscribe("/odometry/filtered/global", 1000, &GpsListener::callbackOdomFilteredGlobal, this);
@@ -321,8 +337,8 @@ public:
             case LOCALIZATION_TF_ODOM_TO_BASE_LINK: return "tf odom->base_link";
             case LOCALIZATION_TF_MAP_TO_BASE_LINK: return "tf map->base_link";
             case LOCALIZATION_TF_UTM_TO_BASE_LINK: return "tf utm->base_link";
-            default:
-                break;
+//            default:
+//                break;
         }
         return "";
     }
@@ -360,6 +376,10 @@ public:
         }
     }
     
+    void callbackGpsHeading(const std_msgs::Float64::ConstPtr& msg) {
+        heading = msg->data * M_PI/180.0;
+    }
+    
     void callbackGps(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         // helpful on how to use conversions: https://github.com/ros-geographic-info/geographic_info/blob/master/geodesy/tests/test_utm.cpp
         geographic_msgs::GeoPoint fromLL;
@@ -375,7 +395,7 @@ public:
             longitude = gpsAsUtm.easting;
             priorLong = longitude;
             priorLat = latitude;
-            heading = 0;
+//            heading = 0;
             return;
         }
         
@@ -391,7 +411,7 @@ public:
         if( (diffLong*diffLong + diffLat*diffLat) > 0.75) {
 //            heading = -atan2(diffLong, diffLat);
             
-            heading = atan2(diffLat,diffLong);// + 3.1415926535897/180.0/2.0;
+//            heading = atan2(diffLat,diffLong);// + 3.1415926535897/180.0/2.0;
             priorLong = longitude;
             priorLat = latitude;
             diffLong = 0;
@@ -402,6 +422,13 @@ public:
         
         covX = msg->position_covariance[0];
         covY = msg->position_covariance[4];
+        
+        for(int i = 0; i < 3; i++) {
+            for(int j = 0; j < 3; j++) {
+                covarianceGps.d[i][j] = msg->position_covariance[i + j*3];
+            }
+        }
+        
         if(localizationMethodToShow == LOCALIZATION_GPS) {
             
             
@@ -411,7 +438,7 @@ public:
             y = gpsAsUtm.northing;
 //            theta = -heading + 3.1415926535897/180.0/2.0;
             theta = heading;
-            theta = headingFromImu; // HACK
+//            theta = headingFromImu; // HACK
         }
         
     }
@@ -628,6 +655,17 @@ void lightModelFs(const FragmentInfo& fInfo) {
     fInfo.colorOutput->a = 0;
 }
 
+void covarianceFs(const FragmentInfo& fInfo) {
+    Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
+//    setRGB(fInfo.pixel, *colorRGB);
+    
+//    Coordinates3D clippedRGB = clipRGB(*colorRGB);
+    fInfo.colorOutput->r = ((double)fInfo.colorOutput->r)*0.5 + colorRGB->x*255.0*0.5;
+    fInfo.colorOutput->g = ((double)fInfo.colorOutput->g)*0.5 + colorRGB->y*255.0*0.5;
+    fInfo.colorOutput->b = ((double)fInfo.colorOutput->b)*0.5 + colorRGB->z*255.0*0.5;
+    fInfo.colorOutput->a = 0;
+}
+
 void generateCirclePolygon(Polygon4D* polygon) {
     polygon->numVertices = 10;
     for(int i = 0; i < polygon->numVertices; i++) {
@@ -693,6 +731,7 @@ public:
         
         char tileFile[200];
         if(downloadTile(tile, "/home/matt", tileFile)) {
+//        if(downloadTile(tile, "/home/pi", tileFile)) {
             map[index].resize(1,1);
             
         } else {
@@ -869,6 +908,7 @@ int main(int argc, char **argv) {
     int screenSizeX, screenSizeY;
     getmaxyx(stdscr, screenSizeY, screenSizeX);
 
+    RasterizerThreadPool::setRenderThreadCount(4);
     RenderPipeline mRenderPipeline;
     mRenderPipeline.resize(screenSizeX, screenSizeY);
     
@@ -1193,15 +1233,17 @@ int main(int argc, char **argv) {
             Mat4D covRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, cameraAxis);
 //            Mat4D covScale = scaleMatrix(10, 10, 1);
             Mat4D covTranslation = translationMatrix(0, 0, 0.5 );
-            Mat4D covModel = matrixMultiply(covRotation, covScale);
+            Mat4D covModel = matrixMultiply(covRotation, mGpsListener.covarianceGps);
             covModel = matrixMultiply(covTranslation, covModel);
             Mat4D covModelView = matrixMultiply(viewMatrix, covModel);
-            Coordinates3D covColor = {0.125, 0, 0.125};
+            Coordinates3D covColor = {0.25, 0, 0.25};
             
             
 //            rasterizePolygonsShader(&unitCircle, 1, covModelView, projection, windowFull, (void*)&covColor, &depthBuffer, lightModelFs, debugLine);
-            mRenderPipeline.setFragmentShader(lightModelFs);
+            mRenderPipeline.setFragmentShader(covarianceFs);
             mRenderPipeline.rasterizePolygonsShader(&unitCircle, 1, covModelView, projection, mRenderPipeline.viewport, (void*)&covColor, debugLine);
+//            mRenderPipeline.rasterizeShader(unitCircle, &mUniformInfo, squareViIndices, 2, (void*)&covColor, myVertexShader);
+            
             
         }
         
@@ -1332,17 +1374,26 @@ int main(int argc, char **argv) {
         } else if ( ch == 'r' || ch == 'R') {
             if (usePerspective) {
                 viewAngle += M_PI * 0.0125;
+                if(viewAngle >= M_PI) {
+                    viewAngle = M_PI - 0.0001;
+                }
                 projection = projectionMatrixPerspective(viewAngle, screenAspect, zFar, zNear);
             } else {
-                orthoScale += 0.5;
+                orthoScale += 0.5;  // this can grow as large as we want
                 projection = projectionMatrixOrtho(orthoScale*screenAspect, orthoScale, zFar, zNear);
             }
         } else if ( ch == 't' || ch == 'T') {
             if (usePerspective) {
                 viewAngle -= M_PI * 0.0125;
+                if(viewAngle < 0.0001) {
+                    viewAngle = 0.0001;
+                }
                 projection = projectionMatrixPerspective(viewAngle, screenAspect, zFar, zNear);
             } else {
                 orthoScale -= 0.5;
+                if(orthoScale  < 0.0100) {
+                    orthoScale = 0.01;
+                }
                 projection = projectionMatrixOrtho(orthoScale*screenAspect, orthoScale, zFar, zNear);
             }
         } else if ( ch == ' ' ) {
