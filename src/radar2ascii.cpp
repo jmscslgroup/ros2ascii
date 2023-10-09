@@ -24,6 +24,7 @@
 #include <curses-gfx-3d.h>
 #include <curses-gfx-handler.h>
 #include <curses-gfx-texture.h>
+#include <curses-gfx-loader.h>
 
 // ROS headers:
 #include "ros/ros.h"
@@ -45,17 +46,31 @@
 
 //#define METERS_PER_DEGREE (111000.0)
 
-
+REGISTER_VERTEX_LAYOUT(MeshVertexInfo)
+    MEMBER(location),
+    MEMBER(normal)
+//    MEMBER(textureCoord)
+//    MEMBER(color)
+END_VERTEX_LAYOUT(MeshVertexInfo)
 
 typedef struct _UniformInfo {
     Mat4D modelView;
     Mat4D modelViewProjection;
+    Mat4D normalMatrix;
 } UniformInfo;
 
-template <class T, class U> void myVertexShader(U* uniformInfo, T& output, T& input) {
+template <class T, class U> void myVertexShader(U* uniformInfo, T& output, const T& input) {
     output.vertex = matrixVectorMultiply(uniformInfo->modelViewProjection, input.vertex);
 //    output.location = matrixVectorMultiply(uniformInfo->modelView, input.vertex);
 //    output.normal = matrixVectorMultiply(uniformInfo->modelView, input.normal);
+    output.textureCoord = input.textureCoord;
+}
+
+template <class T, class U> void covarianceVertexShader(U* uniformInfo, T& output, const T& input) {
+    output.vertex = matrixVectorMultiply(uniformInfo->modelViewProjection, input.vertex);
+    output.location = matrixVectorMultiply(uniformInfo->modelView, input.vertex);
+    output.normal = matrixVectorMultiply(uniformInfo->normalMatrix, input.normal);
+//    output.textureCoord = input.textureCoord;
 }
 
 typedef struct _MapVertexInfo {
@@ -83,61 +98,6 @@ void mapShader(const FragmentInfo& fInfo) {
 static volatile bool keepRunning = true;
 void killPanda(int killSignal) {
     keepRunning = false;
-}
-
-void cleanupConsole() {
-    clear();
-    endwin();
-
-    std::cout << "Console has been cleaned!" << std::endl;
-}
-
-void setupTerminal()
-{
-    
-    setlocale(LC_ALL, "");
-    
-    // Start up Curses window
-    initscr();
-    cbreak();
-    noecho();
-    nodelay(stdscr, 1);    // Don't wait at the getch() function if the user hasn't hit a key
-    keypad(stdscr, 1); // Allow Function key input and arrow key input
-
-    start_color();
-    init_pair(1, COLOR_RED, COLOR_BLACK);
-    init_pair(2, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(3, COLOR_GREEN, COLOR_BLACK);
-    init_pair(4, COLOR_CYAN, COLOR_BLACK);
-    init_pair(5, COLOR_BLUE, COLOR_BLACK);
-    init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(7, COLOR_WHITE, COLOR_BLACK);
-    
-//    init_pair(1, COLOR_RED, COLOR_WHITE);
-//    init_pair(2, COLOR_YELLOW, COLOR_WHITE);
-//    init_pair(3, COLOR_GREEN, COLOR_WHITE);
-//    init_pair(4, COLOR_CYAN, COLOR_WHITE);
-//    init_pair(5, COLOR_BLUE, COLOR_WHITE);
-//    init_pair(6, COLOR_MAGENTA, COLOR_WHITE);
-//    init_pair(7, COLOR_BLACK, COLOR_WHITE);
-    
-//    init_pair(1, COLOR_RED, -1);
-//    init_pair(2, COLOR_YELLOW, -1);
-//    init_pair(3, COLOR_GREEN, -1);
-//    init_pair(4, COLOR_CYAN, -1);
-//    init_pair(5, COLOR_BLUE, -1);
-//    init_pair(6, COLOR_MAGENTA, -1);
-//    init_pair(7, COLOR_WHITE, -1);
-
-
-//    init_pair(5, COLOR_BLACK, COLOR_RED );
-//    init_pair(6, COLOR_BLACK, COLOR_GREEN );
-//    init_pair(7, COLOR_BLACK, COLOR_CYAN );
-//    init_pair(8, COLOR_WHITE, COLOR_BLUE );
-
-    curs_set(0);    // no cursor
-
-//    atexit(destroy);
 }
 
 class ImuListener {
@@ -657,12 +617,19 @@ void lightModelFs(const FragmentInfo& fInfo) {
 
 void covarianceFs(const FragmentInfo& fInfo) {
     Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
+    MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
 //    setRGB(fInfo.pixel, *colorRGB);
     
+    Coordinates3D normal = normalizeVectorFast(vertexInfo->normal);
+    
+    Coordinates3D viewDir = normalizeVectorFast(vertexInfo->location);
+    
+    double magnitude = fabs(dotProduct(viewDir, normal));// fabs(normal.z);
+//    magnitude *= magnitude;
 //    Coordinates3D clippedRGB = clipRGB(*colorRGB);
-    fInfo.colorOutput->r = ((double)fInfo.colorOutput->r)*0.5 + colorRGB->x*255.0*0.5;
-    fInfo.colorOutput->g = ((double)fInfo.colorOutput->g)*0.5 + colorRGB->y*255.0*0.5;
-    fInfo.colorOutput->b = ((double)fInfo.colorOutput->b)*0.5 + colorRGB->z*255.0*0.5;
+    fInfo.colorOutput->r = ((double)fInfo.colorOutput->r)*0.75 + colorRGB->x*255.0*0.25* magnitude;
+    fInfo.colorOutput->g = ((double)fInfo.colorOutput->g)*0.75 + colorRGB->y*255.0*0.25* magnitude;
+    fInfo.colorOutput->b = ((double)fInfo.colorOutput->b)*0.75 + colorRGB->z*255.0*0.25* magnitude;
     fInfo.colorOutput->a = 0;
 }
 
@@ -812,9 +779,15 @@ int main(int argc, char **argv) {
     Polygon4D unitCircle;
     generateCirclePolygon(&unitCircle);
     
+    Scene unitSphereScene;
+    if(unitSphereScene.load("/home/matt/curses-gfx/resources/unit-sphere-low-poly.dae")) {
+        return -1;
+    }
+    
     UniformInfo mUniformInfo;
     
-    setupTerminal();
+    CursesGfxTerminal mCursesGfxTerminal;
+    mCursesGfxTerminal.setupTerminal();
     
     
     
@@ -1236,13 +1209,24 @@ int main(int argc, char **argv) {
             Mat4D covModel = matrixMultiply(covRotation, mGpsListener.covarianceGps);
             covModel = matrixMultiply(covTranslation, covModel);
             Mat4D covModelView = matrixMultiply(viewMatrix, covModel);
-            Coordinates3D covColor = {0.25, 0, 0.25};
+            Coordinates3D covColor = {0.5, 0, 1};
             
             
 //            rasterizePolygonsShader(&unitCircle, 1, covModelView, projection, windowFull, (void*)&covColor, &depthBuffer, lightModelFs, debugLine);
             mRenderPipeline.setFragmentShader(covarianceFs);
-            mRenderPipeline.rasterizePolygonsShader(&unitCircle, 1, covModelView, projection, mRenderPipeline.viewport, (void*)&covColor, debugLine);
-//            mRenderPipeline.rasterizeShader(unitCircle, &mUniformInfo, squareViIndices, 2, (void*)&covColor, myVertexShader);
+//            mRenderPipeline.rasterizePolygonsShader(&unitCircle, 1, covModelView, projection, mRenderPipeline.viewport, (void*)&covColor, debugLine);
+            
+            mUniformInfo.modelView = covModelView;
+            mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+            mUniformInfo.normalMatrix = invert3x3Slow(mUniformInfo.modelView);
+            mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
+            
+            RasterizerThreadPool::waitThreads(0);
+            mRenderPipeline.backfaceCulling = false;
+            mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&covColor, covarianceVertexShader);
+            RasterizerThreadPool::waitThreads(0);
+            mRenderPipeline.backfaceCulling = true;
+            mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&covColor, covarianceVertexShader);
             
             
         }
@@ -1421,6 +1405,5 @@ int main(int argc, char **argv) {
         ros::spinOnce();
     }
 
-    cleanupConsole();
     return 0;
 }
