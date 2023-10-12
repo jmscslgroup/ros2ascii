@@ -14,8 +14,10 @@
 
 #include <cmath>
 #include <iostream>
+#include <fstream>
 
 #include <unistd.h>
+#include <chrono>
 
 #include <ncurses.h>
 #include <termios.h>
@@ -44,7 +46,13 @@
 
 #include "osm-loader.h"
 
-//#define METERS_PER_DEGREE (111000.0)
+
+std::string readFileContents(const char* filename) {
+    std::ifstream ifs(filename);
+    std::string result;
+    ifs >> result;
+    return result;
+}
 
 REGISTER_VERTEX_LAYOUT(MeshVertexInfo)
     MEMBER(location),
@@ -73,6 +81,12 @@ template <class T, class U> void covarianceVertexShader(U* uniformInfo, T& outpu
 //    output.textureCoord = input.textureCoord;
 }
 
+template <class T, class U> void genericCubeVertexShader(U* uniformInfo, T& output, const T& input) {
+    output.vertex = matrixVectorMultiply(uniformInfo->modelViewProjection, input.vertex);
+    output.location = matrixVectorMultiply(uniformInfo->modelView, input.vertex);
+    output.normal = matrixVectorMultiply(uniformInfo->normalMatrix, input.normal);
+}
+
 typedef struct _MapVertexInfo {
     Coordinates4D vertex;
     Coordinates2Df textureCoord;
@@ -89,6 +103,53 @@ void mapShader(const FragmentInfo& fInfo) {
     double factor =  1.0;///(vertexInfo->vertex.z +2);//(Q_rsqrt(vertexInfo->vertex.z*100 + 2);
     *fInfo.colorOutput = mapTexture->sample(vertexInfo->textureCoord.x, vertexInfo->textureCoord.y);
     *fInfo.colorOutput = *fInfo.colorOutput * factor;
+    fInfo.colorOutput->a = 0;
+}
+
+void lightModelFs(const FragmentInfo& fInfo) {
+    Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
+//    setRGB(fInfo.pixel, *colorRGB);
+    
+    Coordinates3D clippedRGB = clipRGB(*colorRGB);
+    fInfo.colorOutput->r = clippedRGB.x*255;
+    fInfo.colorOutput->g = clippedRGB.y*255;
+    fInfo.colorOutput->b = clippedRGB.z*255;
+    fInfo.colorOutput->a = 0;
+}
+
+void covarianceFs(const FragmentInfo& fInfo) {
+    Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
+    MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
+//    setRGB(fInfo.pixel, *colorRGB);
+    
+    Coordinates3D normal = normalizeVectorFast(vertexInfo->normal);
+    
+    Coordinates3D viewDir = normalizeVectorFast(vertexInfo->location);
+    
+    double magnitude = fabs(dotProduct(viewDir, normal));// fabs(normal.z);
+//    magnitude *= magnitude;
+//    Coordinates3D clippedRGB = clipRGB(*colorRGB);
+    fInfo.colorOutput->r = ((double)fInfo.colorOutput->r)*0.8 + colorRGB->x*255.0*0.2* magnitude;
+    fInfo.colorOutput->g = ((double)fInfo.colorOutput->g)*0.8 + colorRGB->y*255.0*0.2* magnitude;
+    fInfo.colorOutput->b = ((double)fInfo.colorOutput->b)*0.8 + colorRGB->z*255.0*0.2* magnitude;
+    fInfo.colorOutput->a = 0;
+}
+
+void genericNormalFs(const FragmentInfo& fInfo) {
+    Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
+    MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
+//    setRGB(fInfo.pixel, *colorRGB);
+    
+    Coordinates3D normal = normalizeVectorFast(vertexInfo->normal);
+    
+    Coordinates3D viewDir = normalizeVectorFast(vertexInfo->location);
+    
+    double magnitude = fabs(dotProduct(viewDir, normal));// fabs(normal.z);
+//    magnitude *= magnitude;
+//    Coordinates3D clippedRGB = clipRGB(*colorRGB);
+    fInfo.colorOutput->r = ((double)fInfo.colorOutput->r)*0.8 + colorRGB->x*255.0*0.2* magnitude;
+    fInfo.colorOutput->g = ((double)fInfo.colorOutput->g)*0.8 + colorRGB->y*255.0*0.2* magnitude;
+    fInfo.colorOutput->b = ((double)fInfo.colorOutput->b)*0.8 + colorRGB->z*255.0*0.2* magnitude;
     fInfo.colorOutput->a = 0;
 }
 
@@ -604,48 +665,21 @@ public:
     void callbackRadar15(const geometry_msgs::PointStamped::ConstPtr& msg) { points[15].x = msg->point.x;points[15].y = msg->point.y; points[15].z = msg->point.z;  }
 };
 
-void lightModelFs(const FragmentInfo& fInfo) {
-    Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
-//    setRGB(fInfo.pixel, *colorRGB);
-    
-    Coordinates3D clippedRGB = clipRGB(*colorRGB);
-    fInfo.colorOutput->r = clippedRGB.x*255;
-    fInfo.colorOutput->g = clippedRGB.y*255;
-    fInfo.colorOutput->b = clippedRGB.z*255;
-    fInfo.colorOutput->a = 0;
-}
 
-void covarianceFs(const FragmentInfo& fInfo) {
-    Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
-    MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
-//    setRGB(fInfo.pixel, *colorRGB);
-    
-    Coordinates3D normal = normalizeVectorFast(vertexInfo->normal);
-    
-    Coordinates3D viewDir = normalizeVectorFast(vertexInfo->location);
-    
-    double magnitude = fabs(dotProduct(viewDir, normal));// fabs(normal.z);
-//    magnitude *= magnitude;
-//    Coordinates3D clippedRGB = clipRGB(*colorRGB);
-    fInfo.colorOutput->r = ((double)fInfo.colorOutput->r)*0.75 + colorRGB->x*255.0*0.25* magnitude;
-    fInfo.colorOutput->g = ((double)fInfo.colorOutput->g)*0.75 + colorRGB->y*255.0*0.25* magnitude;
-    fInfo.colorOutput->b = ((double)fInfo.colorOutput->b)*0.75 + colorRGB->z*255.0*0.25* magnitude;
-    fInfo.colorOutput->a = 0;
-}
 
-void generateCirclePolygon(Polygon4D* polygon) {
-    polygon->numVertices = 10;
-    for(int i = 0; i < polygon->numVertices; i++) {
-        polygon->vertices[i].x = cos(((double)i)/(double)polygon->numVertices*2.0*M_PI);
-        polygon->vertices[i].y = sin(((double)i)/(double)polygon->numVertices*2.0*M_PI);
-        polygon->vertices[i].z = 0;
-        polygon->vertices[i].w = 1;
-        
-        polygon->normals[i].x = 0;
-        polygon->normals[i].y = 0;
-        polygon->normals[i].z = 1;
-    }
-}
+//void generateCirclePolygon(Polygon4D* polygon) {
+//    polygon->numVertices = 10;
+//    for(int i = 0; i < polygon->numVertices; i++) {
+//        polygon->vertices[i].x = cos(((double)i)/(double)polygon->numVertices*2.0*M_PI);
+//        polygon->vertices[i].y = sin(((double)i)/(double)polygon->numVertices*2.0*M_PI);
+//        polygon->vertices[i].z = 0;
+//        polygon->vertices[i].w = 1;
+//
+//        polygon->normals[i].x = 0;
+//        polygon->normals[i].y = 0;
+//        polygon->normals[i].z = 1;
+//    }
+//}
 
 class MapHandler {
 private:
@@ -697,8 +731,10 @@ public:
 //        mapModel = scaleMatrix(currentTileWidth,currentTileWidth,0);
         
         char tileFile[200];
-        if(downloadTile(tile, "/home/matt", tileFile)) {
-//        if(downloadTile(tile, "/home/pi", tileFile)) {
+//        if(downloadTile(tile, "/home/matt", tileFile)) {
+        std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
+        
+        if(downloadTile(tile, homeDirectory.c_str(), tileFile)) {
             map[index].resize(1,1);
             
         } else {
@@ -770,17 +806,20 @@ public:
     }
 };
 
+
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "radar2ascii", ros::init_options::AnonymousName);
 	ROS_INFO("radar2ascii is running...");
 
 	ros::NodeHandle nh;
     
-    Polygon4D unitCircle;
-    generateCirclePolygon(&unitCircle);
+//    Polygon4D unitCircle;
+//    generateCirclePolygon(&unitCircle);
     
+    std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
     Scene unitSphereScene;
-    if(unitSphereScene.load("/home/matt/curses-gfx/resources/unit-sphere-low-poly.dae")) {
+//    if(unitSphereScene.load("/home/matt/curses-gfx/resources/unit-sphere-low-poly.dae")) {
+    if(unitSphereScene.load( (homeDirectory + "curses-gfx/resources/unit-sphere-low-poly.dae").c_str()  ) ) {
         return -1;
     }
     
@@ -881,7 +920,6 @@ int main(int argc, char **argv) {
     int screenSizeX, screenSizeY;
     getmaxyx(stdscr, screenSizeY, screenSizeX);
 
-    RasterizerThreadPool::setRenderThreadCount(4);
     RenderPipeline mRenderPipeline;
     mRenderPipeline.resize(screenSizeX, screenSizeY);
     
@@ -966,19 +1004,19 @@ int main(int argc, char **argv) {
     bool showDepth = false;
     bool showUnitVectors = false;
     
-    ros::Rate rate(60);
+    ros::Rate rate(20);
     
+    // Performance metrics:
+    auto now = std::chrono::high_resolution_clock::now();
+    auto before = now;
+    std::chrono::duration<double, std::milli> float_ms = now - before;
     while(keepRunning && ros::ok()) {
-//        usleep(100000);
         rate.sleep();
         debugLine = 0;
         
-//        depthBuffer.reset();
-//        erase();
         mRenderPipeline.reset();
         
-        mvprintw(debugLine++, 0, "Hello darkness...");
-        mvprintw(debugLine++, 0, "Press ESC to quit");
+        
         
         mGpsListener.updateTf();
         
@@ -1010,7 +1048,7 @@ int main(int argc, char **argv) {
         
         if(autoRotate){
             double distance = 10*sin(angle/2);
-            cameraTranslation = translationMatrix(-(25+distance)*sin(angle), (25+distance) * cos(angle), -(10*cos(angle/5)+distance)-20);
+            cameraTranslation = translationMatrix(-(25+distance)*sin(angle), (25+distance) * cos(angle), -(10*cos(angle/5)+distance)-30);
         }
         viewMatrix = matrixMultiply( cameraOrientation, cameraTranslation);
         
@@ -1205,9 +1243,9 @@ int main(int argc, char **argv) {
             Mat4D covScale = scaleMatrix(mGpsListener.covX, mGpsListener.covY, 1);
             Mat4D covRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, cameraAxis);
 //            Mat4D covScale = scaleMatrix(10, 10, 1);
-            Mat4D covTranslation = translationMatrix(0, 0, 0.5 );
+//            Mat4D covTranslation = translationMatrix(0, 0, 0.5 );
             Mat4D covModel = matrixMultiply(covRotation, mGpsListener.covarianceGps);
-            covModel = matrixMultiply(covTranslation, covModel);
+//            covModel = matrixMultiply(covTranslation, covModel);
             Mat4D covModelView = matrixMultiply(viewMatrix, covModel);
             Coordinates3D covColor = {0.5, 0, 1};
             
@@ -1221,10 +1259,8 @@ int main(int argc, char **argv) {
             mUniformInfo.normalMatrix = invert3x3Slow(mUniformInfo.modelView);
             mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
             
-            RasterizerThreadPool::waitThreads(0);
             mRenderPipeline.backfaceCulling = false;
             mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&covColor, covarianceVertexShader);
-            RasterizerThreadPool::waitThreads(0);
             mRenderPipeline.backfaceCulling = true;
             mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&covColor, covarianceVertexShader);
             
@@ -1238,6 +1274,14 @@ int main(int argc, char **argv) {
         /*
          Start of HUD rendering
          */
+        
+        now = std::chrono::high_resolution_clock::now();
+        float_ms = now - before;
+        before = now;
+        
+        mvprintw(debugLine++, 0, "Hello darkness...");
+        mvprintw(debugLine++, 0, "Press ESC to quit");
+        mvprintw(debugLine++, 0, "FPS: % 0.2f", 1000/float_ms.count());
         
         Coordinates2D steeringCenter;
 //        double steeringWidth = 15;
