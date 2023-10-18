@@ -27,6 +27,7 @@
 #include <curses-gfx-handler.h>
 #include <curses-gfx-texture.h>
 #include <curses-gfx-loader.h>
+#include <curses-gfx-resources.h>
 
 // ROS headers:
 #include "ros/ros.h"
@@ -816,10 +817,10 @@ int main(int argc, char **argv) {
 //    Polygon4D unitCircle;
 //    generateCirclePolygon(&unitCircle);
     
-    std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
+//    std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
     Scene unitSphereScene;
 //    if(unitSphereScene.load("/home/matt/curses-gfx/resources/unit-sphere-low-poly.dae")) {
-    if(unitSphereScene.load( (homeDirectory + "curses-gfx/resources/unit-sphere-low-poly.dae").c_str()  ) ) {
+    if(unitSphereScene.load( (std::string(CURSES_GFX_RESOURCE_PATH) + "unit-sphere-low-poly.dae").c_str()  ) ) {
         return -1;
     }
     
