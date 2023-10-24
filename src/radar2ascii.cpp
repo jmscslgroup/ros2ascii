@@ -45,15 +45,16 @@
 
 #include "geodesy/utm.h"
 
+// project includes
 #include "osm-loader.h"
+#include "resources.h"
 
-
-std::string readFileContents(const char* filename) {
-    std::ifstream ifs(filename);
-    std::string result;
-    ifs >> result;
-    return result;
-}
+//std::string readFileContents(const char* filename) {
+//    std::ifstream ifs(filename);
+//    std::string result;
+//    ifs >> result;
+//    return result;
+//}
 
 REGISTER_VERTEX_LAYOUT(MeshVertexInfo)
     MEMBER(location),
@@ -76,6 +77,13 @@ template <class T, class U> void myVertexShader(U* uniformInfo, T& output, const
 }
 
 template <class T, class U> void covarianceVertexShader(U* uniformInfo, T& output, const T& input) {
+    output.vertex = matrixVectorMultiply(uniformInfo->modelViewProjection, input.vertex);
+    output.location = matrixVectorMultiply(uniformInfo->modelView, input.vertex);
+    output.normal = matrixVectorMultiply(uniformInfo->normalMatrix, input.normal);
+//    output.textureCoord = input.textureCoord;
+}
+
+template <class T, class U> void boxVertexShader(U* uniformInfo, T& output, const T& input) {
     output.vertex = matrixVectorMultiply(uniformInfo->modelViewProjection, input.vertex);
     output.location = matrixVectorMultiply(uniformInfo->modelView, input.vertex);
     output.normal = matrixVectorMultiply(uniformInfo->normalMatrix, input.normal);
@@ -133,6 +141,24 @@ void covarianceFs(const FragmentInfo& fInfo) {
     fInfo.colorOutput->r = ((double)fInfo.colorOutput->r)*0.8 + colorRGB->x*255.0*0.2* magnitude;
     fInfo.colorOutput->g = ((double)fInfo.colorOutput->g)*0.8 + colorRGB->y*255.0*0.2* magnitude;
     fInfo.colorOutput->b = ((double)fInfo.colorOutput->b)*0.8 + colorRGB->z*255.0*0.2* magnitude;
+    fInfo.colorOutput->a = 0;
+}
+
+void boxFs(const FragmentInfo& fInfo) {
+    Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
+    MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
+//    setRGB(fInfo.pixel, *colorRGB);
+    
+    Coordinates3D normal = normalizeVectorFast(vertexInfo->normal);
+    
+    Coordinates3D viewDir = normalizeVectorFast(vertexInfo->location);
+    
+    double magnitude = fabs(dotProduct(viewDir, normal));// fabs(normal.z);
+//    magnitude *= magnitude;
+//    Coordinates3D clippedRGB = clipRGB(*colorRGB);
+    fInfo.colorOutput->r = colorRGB->x*255.0 * magnitude;
+    fInfo.colorOutput->g = colorRGB->y*255.0 * magnitude;
+    fInfo.colorOutput->b = colorRGB->z*255.0 * magnitude;
     fInfo.colorOutput->a = 0;
 }
 
@@ -399,7 +425,8 @@ public:
     }
     
     void callbackGpsHeading(const std_msgs::Float64::ConstPtr& msg) {
-        heading = msg->data * M_PI/180.0;
+//        heading = (msg->data+180-4.04) * M_PI/180.0;
+        heading = -(msg->data-90) * M_PI/180.0;
     }
     
     void callbackGps(const sensor_msgs::NavSatFix::ConstPtr& msg) {
@@ -682,130 +709,130 @@ public:
 //    }
 //}
 
-class MapHandler {
-private:
-    double longitude;
-    double latitude;
-    
-    OsmTile currentTile;
-    double currentTileWidth;
-    double currentTileTopLeftLong;
-    double currentTileTopLeftLat;
-    
-public:
-    int zoom;
-    
-    Texture map[4];
-    bool mapGood[4];
-    
-    Mat4D mapModel[4];
-    
-    MapHandler() {
-        longitude = 0;
-        latitude = 0;
-        zoom = 18;
-        for (int i = 0; i < 4; i++) {
-            mapGood[i] = false;
-        }
-        
-        currentTileWidth = 0;
-        currentTileTopLeftLong = 0;
-        currentTileTopLeftLat = 0;
-        mapModel[0] = translationMatrix(0,0,0);
-    }
-    
-    bool insideMap( double longitude, double latitude) {
-//        OsmTile tile = {zoom, longitude, latitude};
-//        tileToLatLong( tile, longitude, latitude);
-        OsmTile mOsmTile = latLongToTile(zoom, longitude, latitude);
-        return
-        (currentTile.x == mOsmTile.x) &&
-        (currentTile.y == mOsmTile.y) &&
-        (currentTile.zoom == mOsmTile.zoom)
-        ;
-       
-    }
-    
-    void loadTextureFromTile( const OsmTile& tile, int index ) {
-//        tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
-//        currentTileWidth = tileWidthInMeters( latitude, zoom);
-//        mapModel = scaleMatrix(currentTileWidth,currentTileWidth,0);
-        
-        char tileFile[200];
-//        if(downloadTile(tile, "/home/matt", tileFile)) {
-        std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
-        
-        if(downloadTile(tile, homeDirectory.c_str(), tileFile)) {
-            map[index].resize(1,1);
-            
-        } else {
-            map[index].loadPng(tileFile);
-//            map[index].offsetAvergageToCenter(0.75);
-//            map[index].normalize(1.);
+//class MapHandler {
+//private:
+//    double longitude;
+//    double latitude;
+//
+//    OsmTile currentTile;
+//    double currentTileWidth;
+//    double currentTileTopLeftLong;
+//    double currentTileTopLeftLat;
+//
+//public:
+//    int zoom;
+//
+//    Texture map[4];
+//    bool mapGood[4];
+//
+//    Mat4D mapModel[4];
+//
+//    MapHandler() {
+//        longitude = 0;
+//        latitude = 0;
+//        zoom = 18;
+//        for (int i = 0; i < 4; i++) {
+//            mapGood[i] = false;
+//        }
+//
+//        currentTileWidth = 0;
+//        currentTileTopLeftLong = 0;
+//        currentTileTopLeftLat = 0;
+//        mapModel[0] = translationMatrix(0,0,0);
+//    }
+//
+//    bool insideMap( double longitude, double latitude) {
+////        OsmTile tile = {zoom, longitude, latitude};
+////        tileToLatLong( tile, longitude, latitude);
+//        OsmTile mOsmTile = latLongToTile(zoom, longitude, latitude);
+//        return
+//        (currentTile.x == mOsmTile.x) &&
+//        (currentTile.y == mOsmTile.y) &&
+//        (currentTile.zoom == mOsmTile.zoom)
+//        ;
+//
+//    }
+//
+//    void loadTextureFromTile( const OsmTile& tile, int index ) {
+////        tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
+////        currentTileWidth = tileWidthInMeters( latitude, zoom);
+////        mapModel = scaleMatrix(currentTileWidth,currentTileWidth,0);
+//
+//        char tileFile[200];
+////        if(downloadTile(tile, "/home/matt", tileFile)) {
+//        std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
+//
+//        if(downloadTile(tile, homeDirectory.c_str(), tileFile)) {
+//            map[index].resize(1,1);
+//
+//        } else {
+//            map[index].loadPng(tileFile);
+////            map[index].offsetAvergageToCenter(0.75);
+////            map[index].normalize(1.);
+////            map[index].invert();
+//
+//
 //            map[index].invert();
-            
-            
-            map[index].invert();
-            map[index].scale(3);
-//            map[index].normalize(1.);
-        }
-        updateModelMatrix(tile, index);
-    }
-    
-    void updateModelMatrix(const OsmTile& tile, int index) {
-        double xOffset, yOffset;
-//        longLatToOffsetMeters(zoom, longitude, latitude, xOffset, yOffset);
-        tileToOffsetMeters(tile, longitude, latitude, xOffset, yOffset);
-        
-        Mat4D translation = translationMatrix(xOffset,yOffset,0);
-        Mat4D scale = scaleMatrix(currentTileWidth,currentTileWidth,0);
-        mapModel[index] = matrixMultiply( translation, scale);
-    }
-    
-    void updateAdjacentTiles() {
-        double xOffset, yOffset;
-        tileToOffsetMeters(currentTile, longitude, latitude, xOffset, yOffset);
-        
-        OsmTile adjacentTileX = currentTile;
-        if(-xOffset < currentTileWidth/2.0) {
-            adjacentTileX.x--;
-        } else {
-            adjacentTileX.x++;
-        }
-        loadTextureFromTile( adjacentTileX, 1 );
-        
-        OsmTile adjacentTileY = currentTile;
-        if(yOffset < currentTileWidth/2.0) {
-            adjacentTileY.y--;
-        } else {
-            adjacentTileY.y++;
-        }
-        loadTextureFromTile( adjacentTileY, 2 );
-        
-        
-        OsmTile adjacentTileXY = currentTile;
-        adjacentTileXY.x = adjacentTileX.x;
-        adjacentTileXY.y = adjacentTileY.y;
-        loadTextureFromTile( adjacentTileXY, 3 );
-        
-    }
-    
-    void setLongLat( double longitude, double latitude) {
-        this->longitude = longitude;
-        this->latitude = latitude;
-        
-        if(insideMap(longitude, latitude)){
-            updateModelMatrix(currentTile, 0);
-        } else {
-            currentTile = latLongToTile(zoom, longitude, latitude);
-            tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
-            currentTileWidth = tileWidthInMeters( latitude, zoom);
-            loadTextureFromTile( currentTile, 0 );
-        }
-        
-        updateAdjacentTiles();
-    }
-};
+//            map[index].scale(3);
+////            map[index].normalize(1.);
+//        }
+//        updateModelMatrix(tile, index);
+//    }
+//
+//    void updateModelMatrix(const OsmTile& tile, int index) {
+//        double xOffset, yOffset;
+////        longLatToOffsetMeters(zoom, longitude, latitude, xOffset, yOffset);
+//        tileToOffsetMeters(tile, longitude, latitude, xOffset, yOffset);
+//
+//        Mat4D translation = translationMatrix(xOffset,yOffset,0);
+//        Mat4D scale = scaleMatrix(currentTileWidth,currentTileWidth,0);
+//        mapModel[index] = matrixMultiply( translation, scale);
+//    }
+//
+//    void updateAdjacentTiles() {
+//        double xOffset, yOffset;
+//        tileToOffsetMeters(currentTile, longitude, latitude, xOffset, yOffset);
+//
+//        OsmTile adjacentTileX = currentTile;
+//        if(-xOffset < currentTileWidth/2.0) {
+//            adjacentTileX.x--;
+//        } else {
+//            adjacentTileX.x++;
+//        }
+//        loadTextureFromTile( adjacentTileX, 1 );
+//
+//        OsmTile adjacentTileY = currentTile;
+//        if(yOffset < currentTileWidth/2.0) {
+//            adjacentTileY.y--;
+//        } else {
+//            adjacentTileY.y++;
+//        }
+//        loadTextureFromTile( adjacentTileY, 2 );
+//
+//
+//        OsmTile adjacentTileXY = currentTile;
+//        adjacentTileXY.x = adjacentTileX.x;
+//        adjacentTileXY.y = adjacentTileY.y;
+//        loadTextureFromTile( adjacentTileXY, 3 );
+//
+//    }
+//
+//    void setLongLat( double longitude, double latitude) {
+//        this->longitude = longitude;
+//        this->latitude = latitude;
+//
+//        if(insideMap(longitude, latitude)){
+//            updateModelMatrix(currentTile, 0);
+//        } else {
+//            currentTile = latLongToTile(zoom, longitude, latitude);
+//            tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
+//            currentTileWidth = tileWidthInMeters( latitude, zoom);
+//            loadTextureFromTile( currentTile, 0 );
+//        }
+//
+//        updateAdjacentTiles();
+//    }
+//};
 
 
 int main(int argc, char **argv) {
@@ -821,6 +848,11 @@ int main(int argc, char **argv) {
     Scene unitSphereScene;
 //    if(unitSphereScene.load("/home/matt/curses-gfx/resources/unit-sphere-low-poly.dae")) {
     if(unitSphereScene.load( (std::string(CURSES_GFX_RESOURCE_PATH) + "unit-sphere-low-poly.dae").c_str()  ) ) {
+        return -1;
+    }
+    
+    Scene unitCubeScene;
+    if(unitCubeScene.load( (std::string(CURSES_GFX_RESOURCE_PATH) + "unit-cube.stl").c_str()  ) ) {
         return -1;
     }
     
@@ -845,74 +877,74 @@ int main(int argc, char **argv) {
     
     
     
-    Coordinates4D cube[] = {
-        {-1, -1, -1, 1},
-        {-1, -1,  1, 1},
-        {-1,  1,  1, 1},
-        {-1,  1, -1, 1},
-        { 1, -1, -1, 1},
-        { 1, -1,  1, 1},
-        { 1,  1,  1, 1},
-        { 1,  1, -1, 1}
-    };
-    int edgeIndices[12][2] = {
-        {0, 1},
-        {1, 2},
-        {2, 3},
-        {3, 0},
-        {0, 4},
-        {1, 5},
-        {2, 6},
-        {3, 7},
-        {4, 5},
-        {5, 6},
-        {6, 7},
-        {7, 4}
-    };
+//    Coordinates4D cube[] = {
+//        {-1, -1, -1, 1},
+//        {-1, -1,  1, 1},
+//        {-1,  1,  1, 1},
+//        {-1,  1, -1, 1},
+//        { 1, -1, -1, 1},
+//        { 1, -1,  1, 1},
+//        { 1,  1,  1, 1},
+//        { 1,  1, -1, 1}
+//    };
+//    int edgeIndices[12][2] = {
+//        {0, 1},
+//        {1, 2},
+//        {2, 3},
+//        {3, 0},
+//        {0, 4},
+//        {1, 5},
+//        {2, 6},
+//        {3, 7},
+//        {4, 5},
+//        {5, 6},
+//        {6, 7},
+//        {7, 4}
+//    };
+//
+//
+//    int cubeQuadIndices[][4] = {
+//        {0, 1, 2, 3},    // left
+//        {7, 6, 5, 4},    // right
+//        {6, 2, 1, 5},     // top
+//        {0, 3, 7, 4},     // bottom
+//        {2, 6, 7, 3},     // front
+//        {0, 4, 5, 1}     // back
+//    };
     
-    
-    int cubeQuadIndices[][4] = {
-        {0, 1, 2, 3},    // left
-        {7, 6, 5, 4},    // right
-        {6, 2, 1, 5},     // top
-        {0, 3, 7, 4},     // bottom
-        {2, 6, 7, 3},     // front
-        {0, 4, 5, 1}     // back
-    };
-    
-#define NUM_GRID_LINES (15)
-#define GRID_LINE_UNIT (10)
-    Coordinates4D grid[NUM_GRID_LINES*2*2];    // 5x5 grid
-    int gridEdgeIndices[NUM_GRID_LINES*2][2];
-    for (int i = 0; i < NUM_GRID_LINES*2*2; i++) {
-        
-        grid[i].z = 0;
-        grid[i].w = 1;
-    }
-    for (int i = 0; i < NUM_GRID_LINES; i++) {
-        grid[i].x = -(NUM_GRID_LINES-1)/2 + i;
-        grid[i].y = -(NUM_GRID_LINES-1)/2;
-        
-        grid[i+NUM_GRID_LINES].x = -(NUM_GRID_LINES-1)/2 + i;
-        grid[i+NUM_GRID_LINES].y = (NUM_GRID_LINES-1)/2;
-        
-        grid[i+NUM_GRID_LINES*2].x = -(NUM_GRID_LINES-1)/2;
-        grid[i+NUM_GRID_LINES*2].y = -(NUM_GRID_LINES-1)/2 + i;
-        
-        grid[i+NUM_GRID_LINES*3].x = (NUM_GRID_LINES-1)/2;
-        grid[i+NUM_GRID_LINES*3].y = -(NUM_GRID_LINES-1)/2 + i;
-        
-        gridEdgeIndices[i][0] = i;
-        gridEdgeIndices[i][1] = i+NUM_GRID_LINES;
-        
-        gridEdgeIndices[i+NUM_GRID_LINES][0] = i+NUM_GRID_LINES*2;
-        gridEdgeIndices[i+NUM_GRID_LINES][1] = i+NUM_GRID_LINES*3;
-    }
-    
-    for (int i = 0; i < NUM_GRID_LINES*2*2; i++) {
-        grid[i].x *= GRID_LINE_UNIT;
-        grid[i].y *= GRID_LINE_UNIT;
-    }
+//#define NUM_GRID_LINES (15)
+//#define GRID_LINE_UNIT (10)
+//    Coordinates4D grid[NUM_GRID_LINES*2*2];    // 5x5 grid
+//    int gridEdgeIndices[NUM_GRID_LINES*2][2];
+//    for (int i = 0; i < NUM_GRID_LINES*2*2; i++) {
+//
+//        grid[i].z = 0;
+//        grid[i].w = 1;
+//    }
+//    for (int i = 0; i < NUM_GRID_LINES; i++) {
+//        grid[i].x = -(NUM_GRID_LINES-1)/2 + i;
+//        grid[i].y = -(NUM_GRID_LINES-1)/2;
+//
+//        grid[i+NUM_GRID_LINES].x = -(NUM_GRID_LINES-1)/2 + i;
+//        grid[i+NUM_GRID_LINES].y = (NUM_GRID_LINES-1)/2;
+//
+//        grid[i+NUM_GRID_LINES*2].x = -(NUM_GRID_LINES-1)/2;
+//        grid[i+NUM_GRID_LINES*2].y = -(NUM_GRID_LINES-1)/2 + i;
+//
+//        grid[i+NUM_GRID_LINES*3].x = (NUM_GRID_LINES-1)/2;
+//        grid[i+NUM_GRID_LINES*3].y = -(NUM_GRID_LINES-1)/2 + i;
+//
+//        gridEdgeIndices[i][0] = i;
+//        gridEdgeIndices[i][1] = i+NUM_GRID_LINES;
+//
+//        gridEdgeIndices[i+NUM_GRID_LINES][0] = i+NUM_GRID_LINES*2;
+//        gridEdgeIndices[i+NUM_GRID_LINES][1] = i+NUM_GRID_LINES*3;
+//    }
+//
+//    for (int i = 0; i < NUM_GRID_LINES*2*2; i++) {
+//        grid[i].x *= GRID_LINE_UNIT;
+//        grid[i].y *= GRID_LINE_UNIT;
+//    }
     
     double characterAspect = 28.0/12.0; // macOs terminal
 //    double characterAspect = 28.0/14.0; // raspbian terminal
@@ -928,6 +960,13 @@ int main(int argc, char **argv) {
 //    DepthBuffer depthBuffer;
 //    depthBuffer.setSize(screenSizeX, screenSizeY);
 	
+    Coordinates3D colorRed = {1, 0, 0};
+    Coordinates3D colorGreen = {0, 1, 0};
+    Coordinates3D colorBlue = {0, 0, 1};
+    Coordinates3D colorRadar[16];// = colorBlue;
+    Coordinates3D colorCar = {1,1,0};
+    Coordinates3D colorCovariance = {0.5, 0, 1};
+    
     double screenAspect = (double)screenSizeX/(double)screenSizeY / characterAspect;
     
     MapVertexInfo squareVi[4];
@@ -1102,37 +1141,58 @@ int main(int argc, char **argv) {
             frame[4] = matrixMultiply(frameTranslation, frame[4]);
             
             for(int i = 0; i < NUM_FRAMES; i++) {
-                numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
+//                numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
                 
                 Mat4D scale = scaleMatrix(10, 1, 1);
                 Mat4D translation = translationMatrix(1, 0, 0);
                 Mat4D model = matrixMultiply(scale, translation);
                 model = matrixMultiply(frame[i], model);
                 Mat4D modelView = matrixMultiply(viewMatrix, model);
-                Coordinates3D color = {1, 0, 0};
-//                rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, windowFull, (void*)&color, &depthBuffer, lightModelFs, debugLine);
-                mRenderPipeline.setFragmentShader(lightModelFs);
-                mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+//                Coordinates3D color = {1, 0, 0};
+////                rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, windowFull, (void*)&color, &depthBuffer, lightModelFs, debugLine);
+//                mRenderPipeline.setFragmentShader(lightModelFs);
+//                mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+                mRenderPipeline.setFragmentShader(boxFs);
+                mUniformInfo.modelView = modelView;
+                mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+                mUniformInfo.normalMatrix = invert3x3Slow(mUniformInfo.modelView);
+                mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
+                mRenderPipeline.rasterizeShader(unitCubeScene.meshes[0].vi, &mUniformInfo, unitCubeScene.meshes[0].numTriangles, (void*)&colorRed, boxVertexShader);
                 
                 scale= scaleMatrix(1, 10, 1);
                 translation = translationMatrix(0, 1, 0);
                 model = matrixMultiply(scale, translation);
                 model = matrixMultiply(frame[i], model);
                 modelView = matrixMultiply(viewMatrix, model);
-                color = {0, 1, 0};
-//                rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, windowFull, (void*)&color, &depthBuffer, lightModelFs, debugLine);
-                mRenderPipeline.setFragmentShader(lightModelFs);
-                mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+//                color = {0, 1, 0};
+////                rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, windowFull, (void*)&color, &depthBuffer, lightModelFs, debugLine);
+//                mRenderPipeline.setFragmentShader(lightModelFs);
+//                mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+                
+                mRenderPipeline.setFragmentShader(boxFs);
+                mUniformInfo.modelView = modelView;
+                mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+                mUniformInfo.normalMatrix = invert3x3Slow(mUniformInfo.modelView);
+                mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
+                mRenderPipeline.rasterizeShader(unitCubeScene.meshes[0].vi, &mUniformInfo, unitCubeScene.meshes[0].numTriangles, (void*)&colorGreen, boxVertexShader);
+                
                 
                 scale = scaleMatrix(1, 1, 10);
                 translation = translationMatrix(0, 0, 1);
                 model = matrixMultiply(scale, translation);
                 model = matrixMultiply(frame[i], model);
                 modelView = matrixMultiply(viewMatrix, model);
-                color = {0, 0, 1};
-//                rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, windowFull, (void*)&color, &depthBuffer, lightModelFs, debugLine);
-                mRenderPipeline.setFragmentShader(lightModelFs);
-                mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+//                color = {0, 0, 1};
+////                rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, windowFull, (void*)&color, &depthBuffer, lightModelFs, debugLine);
+//                mRenderPipeline.setFragmentShader(lightModelFs);
+//                mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, modelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+                
+                mRenderPipeline.setFragmentShader(boxFs);
+                mUniformInfo.modelView = modelView;
+                mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+                mUniformInfo.normalMatrix = invert3x3Slow(mUniformInfo.modelView);
+                mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
+                mRenderPipeline.rasterizeShader(unitCubeScene.meshes[0].vi, &mUniformInfo, unitCubeScene.meshes[0].numTriangles, (void*)&colorBlue, boxVertexShader);
             }
         }
         
@@ -1146,50 +1206,62 @@ int main(int argc, char **argv) {
             Mat4D translation = translationMatrix(mRadarListener.points[i].x*carScale+ carTranslationLongitude, -mRadarListener.points[i].y*carScale, 1.7272*carScale/2);
             Mat4D model = matrixMultiply(translation, scale);
             Mat4D objectModelView = matrixMultiply(viewMatrix, model);
-            numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
+//            numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
             
-            Coordinates3D color = {0,0,1};
+//            Coordinates3D color = {0,0,1};
             
 //            rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, objectModelView, projection, windowFull, (void*)&color, &depthBuffer, lightModelFs, debugLine);
-            mRenderPipeline.setFragmentShader(lightModelFs);
-            mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, objectModelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+//            mRenderPipeline.setFragmentShader(lightModelFs);
+//            mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, objectModelView, projection, mRenderPipeline.viewport, (void*)&color, debugLine);
+            
+            if(mRadarListener.points[i].z > 0) {
+                colorRadar[i] = {1,0,0};
+            } else {
+                colorRadar[i] = {0,0,1};
+            }
+            mRenderPipeline.setFragmentShader(boxFs);
+            mUniformInfo.modelView = objectModelView;
+            mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+            mUniformInfo.normalMatrix = invert3x3Slow(mUniformInfo.modelView);
+            mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
+            mRenderPipeline.rasterizeShader(unitCubeScene.meshes[0].vi, &mUniformInfo, unitCubeScene.meshes[0].numTriangles, (void*)&colorRadar[i], boxVertexShader);
             
         }
         
         // Grid:
         if (showGrid) {
-//            double latitudeInMeters = mGpsListener.longitude * METERS_PER_DEGREE;
-//            double longitudeInMeters = mGpsListener.latitude * METERS_PER_DEGREE;
-            double latitudeInMeters = -mGpsListener.y;
-            double longitudeInMeters = -mGpsListener.x;
-            
-            double offestLat = fmod(latitudeInMeters *carScale, GRID_LINE_UNIT );
-            double offestLong = fmod(longitudeInMeters*carScale, GRID_LINE_UNIT );
-
-            Mat4D gridOffset = translationMatrix(offestLong, offestLat, 0 );
-            
-            cameraAxis.x = 0;
-            cameraAxis.y = 0;
-            cameraAxis.z = 1;
-//            Mat4D gridRotation = rotationFromAngleAndUnitAxis(-mGpsListener.heading - M_PI/2.0, cameraAxis);
-            Mat4D gridRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, cameraAxis);
-            
-            Coordinates4D grid2[sizeof(grid)/sizeof(grid[0])];
-            for (int i = 0; i < sizeof(grid2)/sizeof(grid2[0]); i++) {
-                grid2[i] = grid[i];
-                // Model
-                grid2[i] = matrixVectorMultiply(gridOffset, grid2[i]);
-                grid2[i] = matrixVectorMultiply(gridRotation, grid2[i]);
-                
-                // View
-                grid2[i] = matrixVectorMultiply(viewMatrix, grid2[i]);
-
-                // Projection
-                grid2[i] = matrixVectorMultiply(projection, grid2[i]);
-            }
-            numEdges = sizeof(gridEdgeIndices)/sizeof(gridEdgeIndices[0]);
-            
-//            rasterize(grid2, gridEdgeIndices, numEdges, windowFull,  &depthBuffer);
+////            double latitudeInMeters = mGpsListener.longitude * METERS_PER_DEGREE;
+////            double longitudeInMeters = mGpsListener.latitude * METERS_PER_DEGREE;
+//            double latitudeInMeters = -mGpsListener.y;
+//            double longitudeInMeters = -mGpsListener.x;
+//
+//            double offestLat = fmod(latitudeInMeters *carScale, GRID_LINE_UNIT );
+//            double offestLong = fmod(longitudeInMeters*carScale, GRID_LINE_UNIT );
+//
+//            Mat4D gridOffset = translationMatrix(offestLong, offestLat, 0 );
+//
+//            cameraAxis.x = 0;
+//            cameraAxis.y = 0;
+//            cameraAxis.z = 1;
+////            Mat4D gridRotation = rotationFromAngleAndUnitAxis(-mGpsListener.heading - M_PI/2.0, cameraAxis);
+//            Mat4D gridRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, cameraAxis);
+//
+//            Coordinates4D grid2[sizeof(grid)/sizeof(grid[0])];
+//            for (int i = 0; i < sizeof(grid2)/sizeof(grid2[0]); i++) {
+//                grid2[i] = grid[i];
+//                // Model
+//                grid2[i] = matrixVectorMultiply(gridOffset, grid2[i]);
+//                grid2[i] = matrixVectorMultiply(gridRotation, grid2[i]);
+//
+//                // View
+//                grid2[i] = matrixVectorMultiply(viewMatrix, grid2[i]);
+//
+//                // Projection
+//                grid2[i] = matrixVectorMultiply(projection, grid2[i]);
+//            }
+////            numEdges = sizeof(gridEdgeIndices)/sizeof(gridEdgeIndices[0]);
+//
+////            rasterize(grid2, gridEdgeIndices, numEdges, windowFull,  &depthBuffer);
             
             
             // Square floor:
@@ -1210,7 +1282,8 @@ int main(int argc, char **argv) {
             // Map
             
             mRenderPipeline.setFragmentShader(mapShader);
-            Mat4D mapRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, cameraAxis);
+            Coordinates3D mapRotationAxis = {0,0,1};
+            Mat4D mapRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, mapRotationAxis);
             for(int i = 0; i < 4; i++) {
                 Mat4D modelViewMap = matrixMultiply(mapRotation, mMapHandler.mapModel[i]);
                 modelViewMap = matrixMultiply(viewMatrix, modelViewMap);
@@ -1222,18 +1295,24 @@ int main(int argc, char **argv) {
         }
         
         // Car:
-        Coordinates3D carColor = {1,1,0};
         Mat4D carScaleMatrix = scaleMatrix(4.6228*carScale/2, 1.8542*carScale/2, 1.7272*carScale/2);
         Mat4D carTranslation = translationMatrix(0, carTranslationLongitude, 1.7272*carScale/2 );
         Mat4D carModel = matrixMultiply(carTranslation, carScaleMatrix);
         Mat4D carModelView = matrixMultiply(viewMatrix, carModel);
-        numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
-        
+//        numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
+//
 //        rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, carModelView, projection, windowFull, (void*)&carColor, &depthBuffer, lightModelFs, debugLine);
-        mRenderPipeline.setFragmentShader(lightModelFs);
-        mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, carModelView, projection, mRenderPipeline.viewport, (void*)&carColor, debugLine);
+//        mRenderPipeline.setFragmentShader(lightModelFs);
+//        mRenderPipeline.rasterizeQuadsShader(cube, cubeQuadIndices, numEdges, carModelView, projection, mRenderPipeline.viewport, (void*)&carColor, debugLine);
         
-        // Covariance circle:
+        mRenderPipeline.setFragmentShader(boxFs);
+        mUniformInfo.modelView = carModelView;
+        mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
+        mUniformInfo.normalMatrix = invert3x3Slow(mUniformInfo.modelView);
+        mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
+        mRenderPipeline.rasterizeShader(unitCubeScene.meshes[0].vi, &mUniformInfo, unitCubeScene.meshes[0].numTriangles, (void*)&colorCar, boxVertexShader);
+        
+        // GPS Covariance sphere:
         if(mGpsListener.covX == mGpsListener.covX &&
            mGpsListener.covY == mGpsListener.covY &&
            mGpsListener.covX != 0 &&
@@ -1248,7 +1327,7 @@ int main(int argc, char **argv) {
             Mat4D covModel = matrixMultiply(covRotation, mGpsListener.covarianceGps);
 //            covModel = matrixMultiply(covTranslation, covModel);
             Mat4D covModelView = matrixMultiply(viewMatrix, covModel);
-            Coordinates3D covColor = {0.5, 0, 1};
+//            Coordinates3D covColor = {0.5, 0, 1};
             
             
 //            rasterizePolygonsShader(&unitCircle, 1, covModelView, projection, windowFull, (void*)&covColor, &depthBuffer, lightModelFs, debugLine);
@@ -1261,9 +1340,9 @@ int main(int argc, char **argv) {
             mUniformInfo.normalMatrix = transpose(mUniformInfo.normalMatrix);
             
             mRenderPipeline.backfaceCulling = false;
-            mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&covColor, covarianceVertexShader);
+            mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&colorCovariance, covarianceVertexShader);
             mRenderPipeline.backfaceCulling = true;
-            mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&covColor, covarianceVertexShader);
+            mRenderPipeline.rasterizeShader(unitSphereScene.meshes[0].vi, &mUniformInfo, unitSphereScene.meshes[0].numTriangles, (void*)&colorCovariance, covarianceVertexShader);
             
             
         }
@@ -1305,7 +1384,7 @@ int main(int argc, char **argv) {
         
         steeringCenter.x -= steeringWidth*2 + 1;
         double angles[2] ;
-        angles[0] = yaw -4.0*M_PI/180.0;
+        angles[0] = mGpsListener.heading;// yaw -4.0*M_PI/180.0;
         angles[1] = kalmanYaw;
         const char* labels[2];
         labels[0] = "Heading";

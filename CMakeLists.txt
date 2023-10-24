@@ -245,7 +245,7 @@ endif()
 
 
 if(DEFINED CURSES_GFX_FOUND)
-	add_executable(radar2ascii src/radar2ascii.cpp src/osm-loader.cpp)
+	add_executable(radar2ascii src/radar2ascii.cpp src/osm-loader.cpp src/resources.cpp)
 	target_link_libraries(radar2ascii  ${catkin_LIBRARIES} ncurses cursesgfx)
 endif()
 

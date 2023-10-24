@@ -101,3 +101,112 @@ bool downloadTile(const OsmTile& tile, const char* cachedirectory, char* resultP
     
     return 0;
 }
+
+
+MapHandler::MapHandler() {
+    longitude = 0;
+    latitude = 0;
+    zoom = 18;
+    for (int i = 0; i < 4; i++) {
+        mapGood[i] = false;
+    }
+    
+    currentTileWidth = 0;
+    currentTileTopLeftLong = 0;
+    currentTileTopLeftLat = 0;
+    mapModel[0] = translationMatrix(0,0,0);
+}
+
+
+
+bool MapHandler::insideMap( double longitude, double latitude) {
+//        OsmTile tile = {zoom, longitude, latitude};
+//        tileToLatLong( tile, longitude, latitude);
+    OsmTile mOsmTile = latLongToTile(zoom, longitude, latitude);
+    return
+    (currentTile.x == mOsmTile.x) &&
+    (currentTile.y == mOsmTile.y) &&
+    (currentTile.zoom == mOsmTile.zoom)
+    ;
+   
+}
+
+void MapHandler::loadTextureFromTile( const OsmTile& tile, int index ) {
+//        tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
+//        currentTileWidth = tileWidthInMeters( latitude, zoom);
+//        mapModel = scaleMatrix(currentTileWidth,currentTileWidth,0);
+    
+    char tileFile[200];
+//        if(downloadTile(tile, "/home/matt", tileFile)) {
+    std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
+    
+    if(downloadTile(tile, homeDirectory.c_str(), tileFile)) {
+        map[index].resize(1,1);
+        
+    } else {
+        map[index].loadPng(tileFile);
+//            map[index].offsetAvergageToCenter(0.75);
+//            map[index].normalize(1.);
+//            map[index].invert();
+        
+        
+        map[index].invert();
+        map[index].scale(3);
+//            map[index].normalize(1.);
+    }
+    updateModelMatrix(tile, index);
+}
+
+void MapHandler::updateModelMatrix(const OsmTile& tile, int index) {
+    double xOffset, yOffset;
+//        longLatToOffsetMeters(zoom, longitude, latitude, xOffset, yOffset);
+    tileToOffsetMeters(tile, longitude, latitude, xOffset, yOffset);
+    
+    Mat4D translation = translationMatrix(xOffset,yOffset,0);
+    Mat4D scale = scaleMatrix(currentTileWidth,currentTileWidth,0);
+    mapModel[index] = matrixMultiply( translation, scale);
+}
+
+void MapHandler::updateAdjacentTiles() {
+    double xOffset, yOffset;
+    tileToOffsetMeters(currentTile, longitude, latitude, xOffset, yOffset);
+    
+    OsmTile adjacentTileX = currentTile;
+    if(-xOffset < currentTileWidth/2.0) {
+        adjacentTileX.x--;
+    } else {
+        adjacentTileX.x++;
+    }
+    loadTextureFromTile( adjacentTileX, 1 );
+    
+    OsmTile adjacentTileY = currentTile;
+    if(yOffset < currentTileWidth/2.0) {
+        adjacentTileY.y--;
+    } else {
+        adjacentTileY.y++;
+    }
+    loadTextureFromTile( adjacentTileY, 2 );
+    
+    
+    OsmTile adjacentTileXY = currentTile;
+    adjacentTileXY.x = adjacentTileX.x;
+    adjacentTileXY.y = adjacentTileY.y;
+    loadTextureFromTile( adjacentTileXY, 3 );
+    
+}
+
+void MapHandler::setLongLat( double longitude, double latitude) {
+    this->longitude = longitude;
+    this->latitude = latitude;
+    
+    if(insideMap(longitude, latitude)){
+        updateModelMatrix(currentTile, 0);
+    } else {
+        currentTile = latLongToTile(zoom, longitude, latitude);
+        tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
+        currentTileWidth = tileWidthInMeters( latitude, zoom);
+        loadTextureFromTile( currentTile, 0 );
+    }
+    
+    updateAdjacentTiles();
+}
