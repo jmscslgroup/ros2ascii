@@ -49,6 +49,11 @@
 #include "osm-loader.h"
 #include "resources.h"
 
+
+#define RAV4_WIDTH (1.8542)
+#define RAV4_LENGTH (4.6228)
+#define RAV4_HEIGHT (1.7272)
+
 //std::string readFileContents(const char* filename) {
 //    std::ifstream ifs(filename);
 //    std::string result;
@@ -364,7 +369,7 @@ public:
         covX = covY = 0;
         covarianceGps = scaleMatrix(1, 1, 1);
         
-        localizationMethodToShow = LOCALIZATION_FILTERED_GLOBAL;
+        localizationMethodToShow = LOCALIZATION_GPS;
 
         nodeHandle = nh;
         subscriberGps = nodeHandle->subscribe("/car/gps/fix", 1000, &GpsListener::callbackGps, this);
@@ -694,147 +699,6 @@ public:
 };
 
 
-
-//void generateCirclePolygon(Polygon4D* polygon) {
-//    polygon->numVertices = 10;
-//    for(int i = 0; i < polygon->numVertices; i++) {
-//        polygon->vertices[i].x = cos(((double)i)/(double)polygon->numVertices*2.0*M_PI);
-//        polygon->vertices[i].y = sin(((double)i)/(double)polygon->numVertices*2.0*M_PI);
-//        polygon->vertices[i].z = 0;
-//        polygon->vertices[i].w = 1;
-//
-//        polygon->normals[i].x = 0;
-//        polygon->normals[i].y = 0;
-//        polygon->normals[i].z = 1;
-//    }
-//}
-
-//class MapHandler {
-//private:
-//    double longitude;
-//    double latitude;
-//
-//    OsmTile currentTile;
-//    double currentTileWidth;
-//    double currentTileTopLeftLong;
-//    double currentTileTopLeftLat;
-//
-//public:
-//    int zoom;
-//
-//    Texture map[4];
-//    bool mapGood[4];
-//
-//    Mat4D mapModel[4];
-//
-//    MapHandler() {
-//        longitude = 0;
-//        latitude = 0;
-//        zoom = 18;
-//        for (int i = 0; i < 4; i++) {
-//            mapGood[i] = false;
-//        }
-//
-//        currentTileWidth = 0;
-//        currentTileTopLeftLong = 0;
-//        currentTileTopLeftLat = 0;
-//        mapModel[0] = translationMatrix(0,0,0);
-//    }
-//
-//    bool insideMap( double longitude, double latitude) {
-////        OsmTile tile = {zoom, longitude, latitude};
-////        tileToLatLong( tile, longitude, latitude);
-//        OsmTile mOsmTile = latLongToTile(zoom, longitude, latitude);
-//        return
-//        (currentTile.x == mOsmTile.x) &&
-//        (currentTile.y == mOsmTile.y) &&
-//        (currentTile.zoom == mOsmTile.zoom)
-//        ;
-//
-//    }
-//
-//    void loadTextureFromTile( const OsmTile& tile, int index ) {
-////        tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
-////        currentTileWidth = tileWidthInMeters( latitude, zoom);
-////        mapModel = scaleMatrix(currentTileWidth,currentTileWidth,0);
-//
-//        char tileFile[200];
-////        if(downloadTile(tile, "/home/matt", tileFile)) {
-//        std::string homeDirectory = "/home/" + readFileContents("/etc/libpanda.d/libpanda_usr") + "/";
-//
-//        if(downloadTile(tile, homeDirectory.c_str(), tileFile)) {
-//            map[index].resize(1,1);
-//
-//        } else {
-//            map[index].loadPng(tileFile);
-////            map[index].offsetAvergageToCenter(0.75);
-////            map[index].normalize(1.);
-////            map[index].invert();
-//
-//
-//            map[index].invert();
-//            map[index].scale(3);
-////            map[index].normalize(1.);
-//        }
-//        updateModelMatrix(tile, index);
-//    }
-//
-//    void updateModelMatrix(const OsmTile& tile, int index) {
-//        double xOffset, yOffset;
-////        longLatToOffsetMeters(zoom, longitude, latitude, xOffset, yOffset);
-//        tileToOffsetMeters(tile, longitude, latitude, xOffset, yOffset);
-//
-//        Mat4D translation = translationMatrix(xOffset,yOffset,0);
-//        Mat4D scale = scaleMatrix(currentTileWidth,currentTileWidth,0);
-//        mapModel[index] = matrixMultiply( translation, scale);
-//    }
-//
-//    void updateAdjacentTiles() {
-//        double xOffset, yOffset;
-//        tileToOffsetMeters(currentTile, longitude, latitude, xOffset, yOffset);
-//
-//        OsmTile adjacentTileX = currentTile;
-//        if(-xOffset < currentTileWidth/2.0) {
-//            adjacentTileX.x--;
-//        } else {
-//            adjacentTileX.x++;
-//        }
-//        loadTextureFromTile( adjacentTileX, 1 );
-//
-//        OsmTile adjacentTileY = currentTile;
-//        if(yOffset < currentTileWidth/2.0) {
-//            adjacentTileY.y--;
-//        } else {
-//            adjacentTileY.y++;
-//        }
-//        loadTextureFromTile( adjacentTileY, 2 );
-//
-//
-//        OsmTile adjacentTileXY = currentTile;
-//        adjacentTileXY.x = adjacentTileX.x;
-//        adjacentTileXY.y = adjacentTileY.y;
-//        loadTextureFromTile( adjacentTileXY, 3 );
-//
-//    }
-//
-//    void setLongLat( double longitude, double latitude) {
-//        this->longitude = longitude;
-//        this->latitude = latitude;
-//
-//        if(insideMap(longitude, latitude)){
-//            updateModelMatrix(currentTile, 0);
-//        } else {
-//            currentTile = latLongToTile(zoom, longitude, latitude);
-//            tileToLatLong( currentTile, currentTileTopLeftLong, currentTileTopLeftLat);
-//            currentTileWidth = tileWidthInMeters( latitude, zoom);
-//            loadTextureFromTile( currentTile, 0 );
-//        }
-//
-//        updateAdjacentTiles();
-//    }
-//};
-
-
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "radar2ascii", ros::init_options::AnonymousName);
 	ROS_INFO("radar2ascii is running...");
@@ -1032,6 +896,7 @@ int main(int argc, char **argv) {
     mRenderPipeline.viewport = makeWindowTransform(screenSizeX, screenSizeY, characterAspect);
 //    windowFull.d[0][0] *= -1;   // HACK the car is aligned with GPS, heading, and radar but mirrores over x.  This mirrors the viewport
     
+    int zoom = 18; // for the MapHandler
     int numEdges;
     int debugLine = 0;
     double lightAngle = 0;
@@ -1197,13 +1062,11 @@ int main(int argc, char **argv) {
         }
         
         int numObjects = 16;
-        double carTranslationLongitude = -0; // -8
-        double carScale = 1;//0.2;
         for( int i = 0; i < numObjects; i++) {
-            Mat4D scale = scaleMatrix(0.15*5, 0.15*5, 0.15*5);
+            Mat4D scale = scaleMatrix(1,1,1);//0.15*5, 0.15*5, 0.15*5);
 //            Mat4D translation = translationMatrix(30 + 40*sin(lightAngle*(i+1)/(double)numObjects), i-numObjects/2, 1);
             // Notice I swapped x and y here:
-            Mat4D translation = translationMatrix(mRadarListener.points[i].x*carScale+ carTranslationLongitude, -mRadarListener.points[i].y*carScale, 1.7272*carScale/2);
+            Mat4D translation = translationMatrix(mRadarListener.points[i].x + RAV4_LENGTH/2, -mRadarListener.points[i].y, RAV4_HEIGHT/2);
             Mat4D model = matrixMultiply(translation, scale);
             Mat4D objectModelView = matrixMultiply(viewMatrix, model);
 //            numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
@@ -1271,7 +1134,9 @@ int main(int argc, char **argv) {
 //            testLat  += 0.00001 * sin(testIncrementor*0.1);
 //            mMapHandler.setLongLat(testLong, testLat);
             
-            mMapHandler.setLongLat(mGpsListener.longitudeRaw, mGpsListener.latitudeRaw);
+            mMapHandler.setLongLat(mGpsListener.longitudeRaw, mGpsListener.latitudeRaw, zoom);
+            MapTextureSet mMapTextureSet;
+            mMapHandler.getCurrentSet(mMapTextureSet);
             
             //        mRenderPipeline.trianglesFill(squareVi, squareViIndices, 2);
 //            Mat4D modelTranslation = translationMatrix(0, 0, 0 );
@@ -1284,19 +1149,22 @@ int main(int argc, char **argv) {
             mRenderPipeline.setFragmentShader(mapShader);
             Coordinates3D mapRotationAxis = {0,0,1};
             Mat4D mapRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, mapRotationAxis);
-            for(int i = 0; i < 4; i++) {
-                Mat4D modelViewMap = matrixMultiply(mapRotation, mMapHandler.mapModel[i]);
+            for(int i = 0; i < mMapTextureSet.length; i++) {
+//            for(int i = 0; i < 4; i++) {
+//                Mat4D modelViewMap = matrixMultiply(mapRotation, mMapHandler.mapModel[i]);
+                Mat4D modelViewMap = matrixMultiply(mapRotation, *mMapTextureSet.models[i]);
                 modelViewMap = matrixMultiply(viewMatrix, modelViewMap);
                 mUniformInfo.modelView = modelViewMap;
                 mUniformInfo.modelViewProjection = matrixMultiply(projection, mUniformInfo.modelView);
-                mRenderPipeline.rasterizeShader(squareVi, &mUniformInfo, squareViIndices, 2, (void*)&mMapHandler.map[i], myVertexShader);
+//                mRenderPipeline.rasterizeShader(squareVi, &mUniformInfo, squareViIndices, 2, (void*)&mMapHandler.map[i], myVertexShader);
+                mRenderPipeline.rasterizeShader(squareVi, &mUniformInfo, squareViIndices, 2, mMapTextureSet.textures[i], myVertexShader);
             }
             
         }
         
         // Car:
-        Mat4D carScaleMatrix = scaleMatrix(4.6228*carScale/2, 1.8542*carScale/2, 1.7272*carScale/2);
-        Mat4D carTranslation = translationMatrix(0, carTranslationLongitude, 1.7272*carScale/2 );
+        Mat4D carScaleMatrix = scaleMatrix(RAV4_LENGTH/2, RAV4_WIDTH/2, RAV4_HEIGHT/2);
+        Mat4D carTranslation = translationMatrix(0, 0, RAV4_HEIGHT/2 );
         Mat4D carModel = matrixMultiply(carTranslation, carScaleMatrix);
         Mat4D carModelView = matrixMultiply(viewMatrix, carModel);
 //        numEdges = sizeof(cubeQuadIndices)/sizeof(cubeQuadIndices[0]);
@@ -1507,11 +1375,11 @@ int main(int argc, char **argv) {
         } else if ( ch == ' ' ) {
             autoRotate = !autoRotate;
         } else if ( ch == '-' || ch == '_' ) {
-            if(mMapHandler.zoom > 2)
-                mMapHandler.zoom--;
+            if(zoom > 2)
+                zoom--;
         } else if ( ch == '=' || ch == '+' ) {
-            if(mMapHandler.zoom < 19)
-                mMapHandler.zoom++;
+            if(zoom < 19)
+                zoom++;
         } else if ( ch == 'd' || ch == 'D' ) {
             showDepth = !showDepth;
         } else if ( ch == 'u' || ch == 'U' ) {
