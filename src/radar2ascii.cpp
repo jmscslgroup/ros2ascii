@@ -306,6 +306,7 @@ private:
     ros::NodeHandle* nodeHandle;
     ros::Subscriber subscriberGps;
     ros::Subscriber subscriberGpsHeading;
+    ros::Subscriber subscriberCarSpeed;
     ros::Subscriber subscriberOdom;
     ros::Subscriber subscriberOdomFilteredLocal;
     ros::Subscriber subscriberOdomFilteredGlobal;
@@ -329,6 +330,8 @@ public:
     
     double heading; // calculated form lat/long
     bool first;
+    
+    double speed;
     
     double carX, carY, carTheta;
     double odomFilteredGlobalX, odomFilteredGlobalY, odomFilteredGlobalTheta;
@@ -361,6 +364,8 @@ public:
         heading = 0; // calculated form lat/long
         first = true;
         
+        speed = 0;
+        
         carX = carY = carTheta = 0;
         odomFilteredGlobalX = odomFilteredGlobalY = odomFilteredGlobalTheta = 0;
         odomFilteredLocalX = odomFilteredLocalY = odomFilteredLocalTheta = 0;
@@ -374,6 +379,8 @@ public:
         nodeHandle = nh;
         subscriberGps = nodeHandle->subscribe("/car/gps/fix", 1000, &GpsListener::callbackGps, this);
         subscriberGpsHeading = nodeHandle->subscribe("/car/gps/heading", 1000, &GpsListener::callbackGpsHeading, this);
+        subscriberCarSpeed = nodeHandle->subscribe("/car/state/vel_x", 1000, &GpsListener::callbackCarSpeed, this);
+        
         subscriberOdom = nodeHandle->subscribe("/car/odometry/differential_drive", 1000, &GpsListener::callbackCarOdom, this);
         subscriberOdomFilteredLocal  = nodeHandle->subscribe("/odometry/filtered/local", 1000, &GpsListener::callbackOdomFilteredLocal, this);
         subscriberOdomFilteredGlobal = nodeHandle->subscribe("/odometry/filtered/global", 1000, &GpsListener::callbackOdomFilteredGlobal, this);
@@ -431,7 +438,11 @@ public:
     
     void callbackGpsHeading(const std_msgs::Float64::ConstPtr& msg) {
 //        heading = (msg->data+180-4.04) * M_PI/180.0;
-        heading = -(msg->data-90) * M_PI/180.0;
+        heading = -(msg->data-90) * M_PI/180.0 + (speed < 0 ? M_PI : 0);
+    }
+    
+    void callbackCarSpeed(const std_msgs::Float64::ConstPtr& msg) {
+        speed = msg->data;
     }
     
     void callbackGps(const sensor_msgs::NavSatFix::ConstPtr& msg) {
@@ -558,6 +569,7 @@ public:
         mvprintw(y+i++, x, "GPS diff Long %.06f", longitude - this->x);
         mvprintw(y+i++, x, "GPS diff Lat  %.06f", latitude - this->y );
         mvprintw(y+i++, x, "GPS diff head %.02f", (heading-theta)  * 180/M_PI);
+        mvprintw(y+i++, x, "Car Speed     %.01f mph", speed/0.44704);
 
         //mvprintw(y+i++, x, "diffMag   %.02f", (diffLong*diffLong + diffLat*diffLat));
         
@@ -585,38 +597,34 @@ void drawGuage(double* angles, int angleCount, Coordinates2D center, double widt
     };
     
     double level; // will be unused
-    int colorIndex = CursesGfxTerminal::rgbToColorIndex(colors[0], level);
+    CursesGfxTerminal::enableThinAscii();
+    CursesGfxTerminal::enableColor(colors[0], level);
     for (double i = 1; i <= 60; i+=1) {
-        attron(COLOR_PAIR(colorIndex));
         double x = center.x + ((double)width)*sin(i *M_PI*2.0/60.0 + angles[0]) + 0.5;
         double y = center.y - ((double)height)*cos(i *M_PI*2.0/60.0 + angles[0]) + 0.5;
         drawDotFloat(x,y);
-//            mvaddch(y, x, '*');
-        attroff(COLOR_PAIR(colorIndex));
     }
+    CursesGfxTerminal::disableColor();
+    CursesGfxTerminal::disableThinAscii();
         
     
     point1 = center;
     
-    attron(A_BOLD);
     
     for (int a = 0; a < angleCount; a++) {
-        colorIndex = CursesGfxTerminal::rgbToColorIndex(colors[a], level);
-        attron(COLOR_PAIR(colorIndex));
+        CursesGfxTerminal::enableColor(colors[a], level);
         point2.x = point1.x + width*cos(angles[a]) + 0.5;
         point2.y = point1.y - height*sin(angles[a]) + 0.5;
         ln2(point1, point2);
-        attroff(COLOR_PAIR(colorIndex));
+        CursesGfxTerminal::disableColor();
     }
-    attroff(A_BOLD);
     
     int offset = 0;
     for (int a = 0; a < angleCount; a++) {
-        colorIndex = CursesGfxTerminal::rgbToColorIndex(colors[a], level);
-        attron(COLOR_PAIR(colorIndex));
+        CursesGfxTerminal::enableColor(colors[a], level);
         mvprintw(center.y - (height + 1), center.x - 20/2 + offset, labels[a]);
         offset += 1 + strlen(labels[a]);
-        attroff(COLOR_PAIR(colorIndex));
+        CursesGfxTerminal::disableColor();
     }
 }
 
@@ -643,27 +651,23 @@ public:
         Coordinates2D point2 = {.x = 25, .y=0};
         
         double level; // will be unused
-        int colorIndex = CursesGfxTerminal::rgbToColorIndex({1,0,1}, level);
+        CursesGfxTerminal::enableThinAscii();
+        CursesGfxTerminal::enableColor({1,0,1}, level);
         for (double i = 1; i <= 60; i+=1) {
-            attron(COLOR_PAIR(colorIndex));
             double x = center.x + ((double)width)*sin(i *M_PI*2.0/60.0 + steeringAngle*M_PI/180.0) + 0.5;
             double y = center.y - ((double)height)*cos(i *M_PI*2.0/60.0 + steeringAngle*M_PI/180.0) + 0.5;
             drawDotFloat(x,y);
-//            mvaddch(y, x, '*');
-            attroff(COLOR_PAIR(colorIndex));
         }
+        CursesGfxTerminal::disableColor();
+        CursesGfxTerminal::disableThinAscii();
         
         point1 = center;
         
-        colorIndex = CursesGfxTerminal::rgbToColorIndex({1,0,0}, level);
-        attron(A_BOLD);
-        attron(COLOR_PAIR(colorIndex));
+        CursesGfxTerminal::enableColor({1,0,0}, level);
         point2.x = point1.x + width*sin(steeringAngle*M_PI/180.0) + 0.5;
         point2.y = point1.y - height*cos(steeringAngle*M_PI/180.0) + 0.5;
         ln2(point1, point2);
-        attroff(COLOR_PAIR(colorIndex));
-        attroff(A_BOLD);
-        
+        CursesGfxTerminal::disableColor();
         
         mvprintw(center.y - (height + 1), center.x - 20/2, "Steering Angle %.01f", steeringAngle);
     }
