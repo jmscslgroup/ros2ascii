@@ -1211,11 +1211,12 @@ int main(int argc, char **argv) {
             cameraAxis.x = 0;
             cameraAxis.y = 0;
             cameraAxis.z = 1;
-            Mat4D covScale = scaleMatrix(mGpsListener.covX, mGpsListener.covY, 1);
+            Mat4D covScale = scaleMatrix(100, 100, 100);
             Mat4D covRotation = rotationFromAngleAndUnitAxis(-mGpsListener.theta, cameraAxis);
 //            Mat4D covScale = scaleMatrix(10, 10, 1);
 //            Mat4D covTranslation = translationMatrix(0, 0, 0.5 );
             Mat4D covModel = matrixMultiply(covRotation, mGpsListener.covarianceGps);
+            covModel = matrixMultiply(covModel, covScale);
 //            covModel = matrixMultiply(covTranslation, covModel);
             Mat4D covModelView = matrixMultiply(viewMatrix, covModel);
 //            Coordinates3D covColor = {0.5, 0, 1};
