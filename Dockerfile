@@ -6,7 +6,8 @@ ENV TERM xterm-256color
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update 
-RUN apt-get install -y nano git libncurses5-dev libassimp-dev pkg-config cmake build-essential libpng-dev
+RUN apt-get install -y curl nano iputils-ping net-tools git
+RUN apt-get install -y libncurses5-dev libassimp-dev libbullet-dev pkg-config cmake build-essential libpng-dev
 
 RUN cd home && git clone https://github.com/blegas78/curses-gfx 
 RUN mkdir -p home/curses-gfx/build
