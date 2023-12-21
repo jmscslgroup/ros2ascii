@@ -23,5 +23,6 @@ RUN mkdir -p home/catkin_ws/src
 RUN cd home/catkin_ws/src/ && git clone https://github.com/jmscslgroup/ros2ascii
 RUN /bin/bash -c '. /opt/ros/noetic/setup.bash; cd home/catkin_ws; catkin_make'
 
-
+#RUN "source /home/catkin_ws/devel/setup.bash"
+RUN echo "source /home/catkin_ws/devel/setup.bash" >> /root/.bashrc
 CMD ["/bin/bash"]
