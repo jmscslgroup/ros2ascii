@@ -110,7 +110,7 @@ REGISTER_VERTEX_LAYOUT(MapVertexInfo)
     MEMBER(textureCoord)
 END_VERTEX_LAYOUT(MapVertexInfo)
 
-void mapShader(const FragmentInfo& fInfo) {
+void mapShader(const FragmentInfo2& fInfo) {
     MapVertexInfo* vertexInfo = (MapVertexInfo*)fInfo.interpolated;
 
     Texture* mapTexture = (Texture*) fInfo.data;
@@ -120,7 +120,7 @@ void mapShader(const FragmentInfo& fInfo) {
     fInfo.colorOutput->a = 0;
 }
 
-void lightModelFs(const FragmentInfo& fInfo) {
+void lightModelFs(const FragmentInfo2& fInfo) {
     Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
 //    setRGB(fInfo.pixel, *colorRGB);
     
@@ -131,7 +131,7 @@ void lightModelFs(const FragmentInfo& fInfo) {
     fInfo.colorOutput->a = 0;
 }
 
-void covarianceFs(const FragmentInfo& fInfo) {
+void covarianceFs(const FragmentInfo2& fInfo) {
     Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
     MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
 //    setRGB(fInfo.pixel, *colorRGB);
@@ -149,7 +149,7 @@ void covarianceFs(const FragmentInfo& fInfo) {
     fInfo.colorOutput->a = 0;
 }
 
-void boxFs(const FragmentInfo& fInfo) {
+void boxFs(const FragmentInfo2& fInfo) {
     Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
     MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
 //    setRGB(fInfo.pixel, *colorRGB);
@@ -167,7 +167,7 @@ void boxFs(const FragmentInfo& fInfo) {
     fInfo.colorOutput->a = 0;
 }
 
-void genericNormalFs(const FragmentInfo& fInfo) {
+void genericNormalFs(const FragmentInfo2& fInfo) {
     Coordinates3D* colorRGB = (Coordinates3D*)fInfo.data;
     MeshVertexInfo* vertexInfo = (MeshVertexInfo*)fInfo.interpolated;
 //    setRGB(fInfo.pixel, *colorRGB);
