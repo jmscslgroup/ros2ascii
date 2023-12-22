@@ -1327,13 +1327,13 @@ int main(int argc, char **argv) {
         } else if ( ch == 'g' || ch == 'G') {
             showGrid = !showGrid;
         } else if ( ch == KEY_LEFT) {
-            angle += 0.05;
+            angle += M_PI/60.0;
         } else if ( ch == KEY_RIGHT) {
-            angle -= 0.05;
+            angle -= M_PI/60.0;
         } else if ( ch == KEY_UP) {
-            tilt += 0.05;
+            tilt += M_PI/120.0;
         } else if ( ch == KEY_DOWN) {
-            tilt -= 0.05;
+            tilt -= M_PI/120.0;
         } else if ( ch == 'a' || ch == 'A') {
             // Left
             Mat4D motion = translationMatrix(+1.00, 0, 0);
