@@ -29,6 +29,28 @@ G: toggle grid
 Escape: quit
 
 
+# Terminal
 
+Different terminals have different performance.  On macOS, the defualt terminal is pretty sluggish, resulting in a choppy framerate.  Instead, iTerm2 is recommended.
 
+https://iterm2.com
 
+  An importable profile for best colors is provided under docs/curses-gfx.json.  In iTerm, navigate to iTerm -> Settings -> Profile -> Other Actions -> Import JSON
+  
+
+# Docker
+
+```
+$ docker build -t ros2ascii .
+$ docker run -it ros2ascii bash
+```
+
+The catkin workspace is located under /home/catkin_ws.  Set the ROS_MASTER_URI to your roscore host with apprpriate domain name and port
+```
+$ export ROS_MASTER_URI=http://piAtHomeForWorkDev.local:11311
+```
+
+Now run 
+```
+$ rosrun ros2ascii radar2ascii
+```
