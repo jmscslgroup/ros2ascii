@@ -330,6 +330,7 @@ public:
     
     double heading; // calculated form lat/long
     bool first;
+    bool headingFromGpsFix;
     
     double speed;
     
@@ -363,6 +364,7 @@ public:
         
         heading = 0; // calculated form lat/long
         first = true;
+        headingFromGpsFix = true;
         
         speed = 0;
         
@@ -438,7 +440,9 @@ public:
     
     void callbackGpsHeading(const std_msgs::Float64::ConstPtr& msg) {
 //        heading = (msg->data+180-4.04) * M_PI/180.0;
+//        heading = -(msg->data-90) * M_PI/180.0 + (speed < 0 ? M_PI : 0);
         heading = -(msg->data-90) * M_PI/180.0 + (speed < 0 ? M_PI : 0);
+	headingFromGpsFix = false;
     }
     
     void callbackCarSpeed(const std_msgs::Float64::ConstPtr& msg) {
@@ -460,23 +464,27 @@ public:
             longitude = gpsAsUtm.easting;
             priorLong = longitude;
             priorLat = latitude;
-//            heading = 0;
+            heading = 0;
             return;
         }
         
         
-        
-//        longitude = 0.85*longitude + 0.15*gpsAsUtm.northing;
-//        latitude = 0.85*latitude + 0.15*gpsAsUtm.easting;
-        longitude = gpsAsUtm.easting;
-        latitude = gpsAsUtm.northing;
+        if(headingFromGpsFix){
+	        longitude = 0.85*longitude + 0.15*gpsAsUtm.easting;
+        	latitude = 0.85*latitude + 0.15*gpsAsUtm.northing;
+	}
+	else{
+	        longitude = gpsAsUtm.easting;
+        	latitude = gpsAsUtm.northing;
+	}
         
         diffLong = (longitude - priorLong);// * METERS_PER_DEGREE;
         diffLat = (latitude - priorLat);// * METERS_PER_DEGREE;
         if( (diffLong*diffLong + diffLat*diffLat) > 0.75) {
 //            heading = -atan2(diffLong, diffLat);
-            
-//            heading = atan2(diffLat,diffLong);// + 3.1415926535897/180.0/2.0;
+            if(headingFromGpsFix){
+	            heading = atan2(diffLat,diffLong);// + 3.1415926535897/180.0/2.0;
+		}
             priorLong = longitude;
             priorLat = latitude;
             diffLong = 0;
