@@ -94,7 +94,7 @@ bool downloadTile(const OsmTile& tile, const char* cachedirectory, char* resultP
     //    printf("Executing command: %s\n", command);
     system(command);
     //    snprintf(command, 256, "curl --remove-on-error --max-time 3 https://tile.openstreetmap.org/%d/%d/%d.png -o %s", tile.zoom, tile.x, tile.y, resultPath);
-    snprintf(command, 256, "curl --silent --max-time 2 https://tile.openstreetmap.org/%d/%d/%d.png -o %s", tile.zoom, tile.x, tile.y, resultPath);
+    snprintf(command, 256, "curl --silent --fail --max-time 5 -A \"ros2ascii/1.0 (+https://github.com/jmscslgroup/ros2ascii)\" https://tile.openstreetmap.org/%d/%d/%d.png -o %s", tile.zoom, tile.x, tile.y, resultPath);
     //    printf("Executing command: %s\n", command);
     
     if(system(command) != 0) {
